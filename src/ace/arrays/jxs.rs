@@ -1,10 +1,12 @@
 #![allow(dead_code)]
 
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use crate::ace::arrays::NxsArray;
 use crate::ace::utils;
+use crate::ace::arrays::NxsArray;
 
 // Represents an entry within the JXS array containing location and length of a data block
 #[derive(Debug, Clone, PartialEq)]
@@ -29,78 +31,58 @@ impl JxsEntry {
     }
 }
 
-// Indices for different values within JXS array, corresponding to the ACE format specification.
-#[repr(usize)]
-#[derive(Debug, Clone, Copy)]
-pub enum JxsIndex {
-    Esz = 0,    // Energy table
-    Nu = 1,     // Fission nu data
-    Mtr = 2,    // MT array
-    Lqr = 3,    // Q-value array
-    Tyr = 4,    // Reaction type array
-    Lsig = 5,   // Table of cross section locators
-    Sig = 6,    // Cross sections
-    Land = 7,   // Table of angular distribution locators
-    And = 8,    // Angular distributions
-    Ldlw = 9,   // Table of energy distribution locators
-    Dlw = 10,   // Energy distributions
-    Gpd = 11,   // Photon production data
-    Mtrp = 12,  // Photon production MT array
-    Lsigp = 13, // Table of photon production cross section locators
-    Sigp = 14,  // Photon production cross sections
-    Landp = 15, // Table of photon production angular distribution locators
-    Andp = 16,  // Photon production angular distributions
-    Ldlwp = 17, // Table of photon production energy distribution locators
-    Dlwp = 18,  // Photon production energy distributions
-    Yp = 19,    // Table of yield multipliers
-    Fis = 20,   // Total fission cross section
-    End = 21,   // Last word of the conventional table
-    Lund = 22,  // Probability tables
-    Dnu = 23,   // Delayed nu-bar data
-    Bdd = 24,   // Basic delayed neutron precursor data
-    Dnedl = 25, // Table of delayed neutron energy distribution locators
-    Dned = 26,  // Delayed neutron energy distributions
-    Ptype = 29, // Particle type array
-    Ntro = 30,  // Array containing number of particle production reactions
-    Next = 31,  // Table of particle production locators
+impl BlockType {
+    fn from_jxs_index(value: usize) -> Option<Self> {
+        match value {
+            0 => Some(BlockType::ESZ),
+            1 => Some(BlockType::NU),
+            2 => Some(BlockType::MTR),
+            3 => Some(BlockType::LQR),
+            4 => Some(BlockType::TYR),
+            5 => Some(BlockType::LSIG),
+            6 => Some(BlockType::SIG),
+            7 => Some(BlockType::LAND),
+            8 => Some(BlockType::AND),
+            9 => Some(BlockType::LDLW),
+            10 => Some(BlockType::DLW),
+            11 => Some(BlockType::GPD),
+            12 => Some(BlockType::MTRP),
+            13 => Some(BlockType::LSIGP),
+            14 => Some(BlockType::SIGP),
+            15 => Some(BlockType::LANDP),
+            16 => Some(BlockType::ANDP),
+            17 => Some(BlockType::LDLWP),
+            18 => Some(BlockType::DLWP),
+            19 => Some(BlockType::YP),
+            20 => Some(BlockType::FIS),
+            21 => Some(BlockType::END),
+            22 => Some(BlockType::LUND),
+            23 => Some(BlockType::DNU),
+            24 => Some(BlockType::BDD),
+            25 => Some(BlockType::DNEDL),
+            26 => Some(BlockType::DNED),
+            29 => Some(BlockType::PTYPE),
+            30 => Some(BlockType::NTRO),
+            31 => Some(BlockType::NEXT),
+            _ => None, // Return None for invalid integers
+        }
+    }
 }
 
+use crate::ace::blocks::BlockType;
 // Represents the complete JXS array from an ACE file
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct JxsArray {
-    esz: Option<JxsEntry>,     // Energy table
-    nu: Option<JxsEntry>,      // Fission nu data
-    mtr: Option<JxsEntry>,     // MT array
-    lqr: Option<JxsEntry>,     // Q-value array
-    tyr: Option<JxsEntry>,     // Reaction type array
-    lsig: Option<JxsEntry>,    // Table of cross section locators
-    sig: Option<JxsEntry>,     // Cross sections
-    land: Option<JxsEntry>,    // Table of angular distribution locators
-    and: Option<JxsEntry>,     // Angular distributions
-    ldlw: Option<JxsEntry>,   // Table of energy distribution locators
-    dlw: Option<JxsEntry>,    // Energy distributions
-    gpd: Option<JxsEntry>,    // Photon production data
-    mtrp: Option<JxsEntry>,   // Photon production MT array
-    lsigp: Option<JxsEntry>,  // Table of photon production cross section locators
-    sigp: Option<JxsEntry>,   // Photon production cross sections
-    landp: Option<JxsEntry>,  // Table of photon production angular distribution locators
-    andp: Option<JxsEntry>,   // Photon production angular distributions
-    ldlwp: Option<JxsEntry>,  // Table of photon production energy distribution locators
-    dlwp: Option<JxsEntry>,   // Photon production energy distributions
-    yp: Option<JxsEntry>,     // Table of yield multipliers
-    fis: Option<JxsEntry>,    // Total fission cross section
-    end: Option<JxsEntry>,    // Last word of the conventional table
-    lund: Option<JxsEntry>,   // Probability tables
-    dnu: Option<JxsEntry>,    // Delayed nu-bar data
-    bdd: Option<JxsEntry>,    // Basic delayed neutron precursor data
-    dnedl: Option<JxsEntry>,  // Table of delayed neutron energy distribution locators
-    dned: Option<JxsEntry>,   // Delayed neutron energy distributions
-    ptype: Option<JxsEntry>,  // Particle type array
-    ntro: Option<JxsEntry>,   // Array containing number of particle production reactions
-    next: Option<JxsEntry>,   // Table of particle production locators
+    pub block_bounds: HashMap<BlockType, Option<JxsEntry>>
 }
 
 impl JxsArray {
+    pub fn new() -> Self {
+        Self {
+            block_bounds: HashMap::new(),
+        }
+    }
+
     // Creates a new JxsArray from an ASCII file reader and NXS array information.
     pub fn from_ascii_file(reader: &mut BufReader<File>, nxs_array: &NxsArray) -> Result<Self, Box<dyn Error>> {
         // A JXS array consists of 4 lines, each with eight integers.
@@ -119,77 +101,43 @@ impl JxsArray {
             .collect();
 
         // Builder scheme to ease intialization
-        let mut jxs_builder = JxsArrayBuilder::default();
+        let mut jxs_array = JxsArray::new();
         for i in 0..32 {
-            let loc = parsed_jxs_array[i];
-            match loc == 0 {
-                // Block does not exist
-                true => {
-                    jxs_builder.set_field(i, None)
-                },
-                // Block exists
-                false => {
-                    // Loop forward to find the length of the block
-                    let mut next_i = i + 1;
-                    while next_i < 32 && parsed_jxs_array[next_i] == 0 {
-                        next_i += 1;
+            // Skip any indices we do not have support for currently
+            if let Some(block_type) = BlockType::from_jxs_index(i) {
+                let loc = parsed_jxs_array[i];
+                match loc == 0 {
+                    // Block does not exist
+                    true => {
+                        jxs_array.block_bounds
+                            .insert(block_type, None);
+                    },
+                    // Block exists
+                    false => {
+                        // Loop forward to find the length of the block
+                        let mut next_i = i + 1;
+                        while next_i < 32 && parsed_jxs_array[next_i] == 0 {
+                            next_i += 1;
+                        }
+                        let len = if next_i != 32 {
+                            parsed_jxs_array[next_i] - loc
+                        } else {
+                            nxs_array.xxs_len - loc
+                        };
+                        jxs_array.block_bounds.insert(block_type, Some(JxsEntry::new(loc, len)));
                     }
-                    let len = if next_i != 32 {
-                        parsed_jxs_array[next_i] - loc
-                    } else {
-                        nxs_array.xxs_len - loc
-                    };
-                    jxs_builder.set_field(i, Some(JxsEntry::new(loc, len)));
-                },
+                }
             }
         }
-        Ok(jxs_builder.build())
+        Ok(jxs_array)
     }
 }
 
-#[derive(Default)]
-struct JxsArrayBuilder {
-    fields: [Option<JxsEntry>; 32],
-}
+impl Deref for JxsArray {
+    type Target = HashMap<BlockType, Option<JxsEntry>>;
 
-impl JxsArrayBuilder {
-    fn set_field(&mut self, index: usize, value: Option<JxsEntry>) {
-        self.fields[index] = value;
-    }
-
-    fn build(self) -> JxsArray {
-        JxsArray {
-            esz: self.fields[JxsIndex::Esz as usize].clone(),       // Energy table
-            nu: self.fields[JxsIndex::Nu as usize].clone(),         // Fission nu data
-            mtr: self.fields[JxsIndex::Mtr as usize].clone(),       // MT array
-            lqr: self.fields[JxsIndex::Lqr as usize].clone(),       // Q-value array
-            tyr: self.fields[JxsIndex::Tyr as usize].clone(),       // Reaction type array
-            lsig: self.fields[JxsIndex::Lsig as usize].clone(),     // Table of cross section locators
-            sig: self.fields[JxsIndex::Sig as usize].clone(),       // Cross sections
-            land: self.fields[JxsIndex::Land as usize].clone(),     // Table of angular distribution locators
-            and: self.fields[JxsIndex::And as usize].clone(),       // Angular distributions
-            ldlw: self.fields[JxsIndex::Ldlw as usize].clone(),     // Table of energy distribution locators
-            dlw: self.fields[JxsIndex::Dlw as usize].clone(),       // Energy distributions
-            gpd: self.fields[JxsIndex::Gpd as usize].clone(),       // Photon production data
-            mtrp: self.fields[JxsIndex::Mtrp as usize].clone(),     // Photon production MT array
-            lsigp: self.fields[JxsIndex::Lsigp as usize].clone(),   // Table of photon production cross section locators
-            sigp: self.fields[JxsIndex::Sigp as usize].clone(),     // Photon production cross sections
-            landp: self.fields[JxsIndex::Landp as usize].clone(),   // Table of photon production angular distribution locators
-            andp: self.fields[JxsIndex::Andp as usize].clone(),     // Photon production angular distributions
-            ldlwp: self.fields[JxsIndex::Ldlwp as usize].clone(),   // Table of photon production energy distribution locators
-            dlwp: self.fields[JxsIndex::Dlwp as usize].clone(),     // Photon production energy distributions
-            yp: self.fields[JxsIndex::Yp as usize].clone(),         // Table of yield multipliers
-            fis: self.fields[JxsIndex::Fis as usize].clone(),       // Total fission cross section
-            end: self.fields[JxsIndex::End as usize].clone(),       // Last word of the conventional table
-            lund: self.fields[JxsIndex::Lund as usize].clone(),     // Probability tables
-            dnu: self.fields[JxsIndex::Dnu as usize].clone(),       // Delayed nu-bar data
-            bdd: self.fields[JxsIndex::Bdd as usize].clone(),       // Basic delayed neutron precursor data
-            dnedl: self.fields[JxsIndex::Dnedl as usize].clone(),   // Table of delayed neutron energy distribution locators
-            dned: self.fields[JxsIndex::Dned as usize].clone(),     // Delayed neutron energy distributions
-            ptype: self.fields[JxsIndex::Ptype as usize].clone(),   // Particle type array
-            ntro: self.fields[JxsIndex::Ntro as usize].clone(),     // Array containing number of particle production reactions
-            next: self.fields[JxsIndex::Next as usize].clone(),     // Table of particle production locators
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.block_bounds
     }
 }
 
@@ -243,35 +191,35 @@ mod tests {
         let jxs = JxsArray::from_ascii_file(&mut reader, &nxs).expect("Failed to parse JXS array");
 
         // Check fields
-        assert_eq!(jxs.esz, Some(JxsEntry::new(1, 2)));
-        assert_eq!(jxs.nu, None);
-        assert_eq!(jxs.mtr, Some(JxsEntry::new(3, 1)));
-        assert_eq!(jxs.lqr, Some(JxsEntry::new(4, 1)));
-        assert_eq!(jxs.tyr, Some(JxsEntry::new(5, 1)));
-        assert_eq!(jxs.lsig, Some(JxsEntry::new(6, 1)));
-        assert_eq!(jxs.sig, Some(JxsEntry::new(7, 1)));
-        assert_eq!(jxs.land, Some(JxsEntry::new(8, 1)));
-        assert_eq!(jxs.and, Some(JxsEntry::new(9, 1)));
-        assert_eq!(jxs.ldlw, Some(JxsEntry::new(10, 4)));
-        assert_eq!(jxs.dlw, None);
-        assert_eq!(jxs.gpd, None);
-        assert_eq!(jxs.mtrp, None);
-        assert_eq!(jxs.lsigp, Some(JxsEntry::new(14, 1)));
-        assert_eq!(jxs.sigp, Some(JxsEntry::new(15, 1)));
-        assert_eq!(jxs.landp, Some(JxsEntry::new(16, 1)));
-        assert_eq!(jxs.andp, Some(JxsEntry::new(17, 1)));
-        assert_eq!(jxs.ldlwp, Some(JxsEntry::new(18, 1)));
-        assert_eq!(jxs.dlwp, Some(JxsEntry::new(19, 1)));
-        assert_eq!(jxs.yp, Some(JxsEntry::new(20, 1)));
-        assert_eq!(jxs.fis, Some(JxsEntry::new(21, 1)));
-        assert_eq!(jxs.end, Some(JxsEntry::new(22, 1)));
-        assert_eq!(jxs.lund, Some(JxsEntry::new(23, 1)));
-        assert_eq!(jxs.dnu, Some(JxsEntry::new(24, 1)));
-        assert_eq!(jxs.bdd, Some(JxsEntry::new(25, 1)));
-        assert_eq!(jxs.dnedl, Some(JxsEntry::new(26, 1)));
-        assert_eq!(jxs.dned, Some(JxsEntry::new(27, 1)));
-        assert_eq!(jxs.ptype, Some(JxsEntry::new(30, 1)));
-        assert_eq!(jxs.ntro, Some(JxsEntry::new(31, 1)));
-        assert_eq!(jxs.next, Some(JxsEntry::new(32, 68)));
+        assert_eq!(jxs.get(&BlockType::ESZ).unwrap(), &Some(JxsEntry::new(1, 2)));
+        assert_eq!(jxs.get(&BlockType::NU).unwrap(), &None);
+        assert_eq!(jxs.get(&BlockType::MTR).unwrap(), &Some(JxsEntry::new(3, 1)));
+        assert_eq!(jxs.get(&BlockType::LQR).unwrap(), &Some(JxsEntry::new(4, 1)));
+        assert_eq!(jxs.get(&BlockType::TYR).unwrap(), &Some(JxsEntry::new(5, 1)));
+        assert_eq!(jxs.get(&BlockType::LSIG).unwrap(), &Some(JxsEntry::new(6, 1)));
+        assert_eq!(jxs.get(&BlockType::SIG).unwrap(), &Some(JxsEntry::new(7, 1)));
+        assert_eq!(jxs.get(&BlockType::LAND).unwrap(), &Some(JxsEntry::new(8, 1)));
+        assert_eq!(jxs.get(&BlockType::AND).unwrap(), &Some(JxsEntry::new(9, 1)));
+        assert_eq!(jxs.get(&BlockType::LDLW).unwrap(), &Some(JxsEntry::new(10, 4)));
+        assert_eq!(jxs.get(&BlockType::DLW).unwrap(), &None);
+        assert_eq!(jxs.get(&BlockType::GPD).unwrap(), &None);
+        assert_eq!(jxs.get(&BlockType::MTRP).unwrap(), &None);
+        assert_eq!(jxs.get(&BlockType::LSIGP).unwrap(), &Some(JxsEntry::new(14, 1)));
+        assert_eq!(jxs.get(&BlockType::SIGP).unwrap(), &Some(JxsEntry::new(15, 1)));
+        assert_eq!(jxs.get(&BlockType::LANDP).unwrap(), &Some(JxsEntry::new(16, 1)));
+        assert_eq!(jxs.get(&BlockType::ANDP).unwrap(), &Some(JxsEntry::new(17, 1)));
+        assert_eq!(jxs.get(&BlockType::LDLWP).unwrap(), &Some(JxsEntry::new(18, 1)));
+        assert_eq!(jxs.get(&BlockType::DLWP).unwrap(), &Some(JxsEntry::new(19, 1)));
+        assert_eq!(jxs.get(&BlockType::YP).unwrap(), &Some(JxsEntry::new(20, 1)));
+        assert_eq!(jxs.get(&BlockType::FIS).unwrap(), &Some(JxsEntry::new(21, 1)));
+        assert_eq!(jxs.get(&BlockType::END).unwrap(), &Some(JxsEntry::new(22, 1)));
+        assert_eq!(jxs.get(&BlockType::LUND).unwrap(), &Some(JxsEntry::new(23, 1)));
+        assert_eq!(jxs.get(&BlockType::DNU).unwrap(), &Some(JxsEntry::new(24, 1)));
+        assert_eq!(jxs.get(&BlockType::BDD).unwrap(), &Some(JxsEntry::new(25, 1)));
+        assert_eq!(jxs.get(&BlockType::DNEDL).unwrap(), &Some(JxsEntry::new(26, 1)));
+        assert_eq!(jxs.get(&BlockType::DNED).unwrap(), &Some(JxsEntry::new(27, 1)));
+        assert_eq!(jxs.get(&BlockType::PTYPE).unwrap(), &Some(JxsEntry::new(30, 1)));
+        assert_eq!(jxs.get(&BlockType::NTRO).unwrap(), &Some(JxsEntry::new(31, 1)));
+        assert_eq!(jxs.get(&BlockType::NEXT).unwrap(), &Some(JxsEntry::new(32, 68)));
     }
 }
