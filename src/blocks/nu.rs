@@ -1,9 +1,9 @@
 use anyhow::Result;
 
 use crate::arrays::Arrays;
-use crate::interpolation::{InterpolationTable, InterpolationError};
 use crate::blocks::BlockType;
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
+use crate::interpolation::{InterpolationError, InterpolationTable};
 
 //=====================================================================
 // NU data block
@@ -38,16 +38,21 @@ impl<'a> PullFromXXS<'a> for NU {
         // We have both blocks, so we need to check the length of the second block
         if prompt_and_or_total_flag < 0 {
             // Jump to start of total nu and check if it is polynomial or tabulated
-            let total_nu_poly_or_tabulated =  arrays.xxs[block_start + block_length].to_bits() as usize;
+            let total_nu_poly_or_tabulated =
+                arrays.xxs[block_start + block_length].to_bits() as usize;
             let total_nu_start = block_start + block_length + 1;
             // We have a polynomial formulation for total nu
             if total_nu_poly_or_tabulated == 1 {
                 block_length += 2 + arrays.xxs[total_nu_start].to_bits() as usize;
             // We have a tabulated formulation for total nu
             } else if total_nu_poly_or_tabulated == 2 {
-                block_length += 1 + InterpolationTable::get_table_length(total_nu_start, arrays.xxs);
+                block_length +=
+                    1 + InterpolationTable::get_table_length(total_nu_start, arrays.xxs);
             } else {
-                panic!("Unknown total nu formulation, expected 1 or 2, got {}", total_nu_poly_or_tabulated);
+                panic!(
+                    "Unknown total nu formulation, expected 1 or 2, got {}",
+                    total_nu_poly_or_tabulated
+                );
             }
         }
 
@@ -67,12 +72,12 @@ impl<'a> Process<'a> for NU {
 
         let prompt_or_total_nu = match first_nu_data[0].to_bits() as usize {
             1 => NuFormulation::Polynomial(PolynomialNu {
-                coefficients: first_nu_data[2..].to_vec()
+                coefficients: first_nu_data[2..].to_vec(),
             }),
             2 => NuFormulation::Tabulated(TabulatedNu {
-                table: InterpolationTable::process(&first_nu_data[1..])
+                table: InterpolationTable::process(&first_nu_data[1..]),
             }),
-            _ => panic!("Unknown prompt/total nu formulation")
+            _ => panic!("Unknown prompt/total nu formulation"),
         };
 
         // We have both blocks
@@ -80,27 +85,27 @@ impl<'a> Process<'a> for NU {
             let second_nu_data = &data[first_nu_length + 1..];
             let total_nu = match second_nu_data[0].to_bits() as usize {
                 1 => NuFormulation::Polynomial(PolynomialNu {
-                    coefficients: second_nu_data[2..].to_vec()
+                    coefficients: second_nu_data[2..].to_vec(),
                 }),
                 2 => NuFormulation::Tabulated(TabulatedNu {
-                    table: InterpolationTable::process(&second_nu_data[1..])
+                    table: InterpolationTable::process(&second_nu_data[1..]),
                 }),
-                _ => panic!("Unknown total nu formulation")
+                _ => panic!("Unknown total nu formulation"),
             };
             NU {
                 prompt: Some(prompt_or_total_nu),
-                total: Some(total_nu)
+                total: Some(total_nu),
             }
         // We do not have both blocks
         } else if arrays.jxs.get(&BlockType::DNU) != 0 {
             NU {
                 prompt: Some(prompt_or_total_nu),
-                total: None
+                total: None,
             }
         } else {
             NU {
                 prompt: None,
-                total: Some(prompt_or_total_nu)
+                total: Some(prompt_or_total_nu),
             }
         }
     }
@@ -140,7 +145,7 @@ impl NuFormulation {
 // Polynomial formulation for NU
 #[derive(Debug, Clone)]
 pub struct PolynomialNu {
-    pub coefficients: Vec<f64>
+    pub coefficients: Vec<f64>,
 }
 
 impl PolynomialNu {
@@ -157,7 +162,7 @@ impl PolynomialNu {
 // Polynomial formulation for NU
 #[derive(Debug, Clone)]
 pub struct TabulatedNu {
-    pub table: InterpolationTable
+    pub table: InterpolationTable,
 }
 
 impl TabulatedNu {
@@ -166,8 +171,6 @@ impl TabulatedNu {
         self.table.interpolate(energy)
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -183,13 +186,19 @@ mod tests {
         let nu = parsed_ace.data_blocks.NU.unwrap();
         assert!(nu.prompt.is_some());
         assert!(nu.total.is_some());
-        assert!(matches!(nu.prompt.as_ref().unwrap(), NuFormulation::Polynomial(_)));
-        assert!(matches!(nu.total.as_ref().unwrap(), NuFormulation::Tabulated(_)));
+        assert!(matches!(
+            nu.prompt.as_ref().unwrap(),
+            NuFormulation::Polynomial(_)
+        ));
+        assert!(matches!(
+            nu.total.as_ref().unwrap(),
+            NuFormulation::Tabulated(_)
+        ));
 
         // Check prompt nu
         let prompt = match nu.prompt.unwrap() {
             NuFormulation::Polynomial(poly) => poly,
-            _ => panic!("This should be a polynomial")
+            _ => panic!("This should be a polynomial"),
         };
         assert_eq!(prompt.coefficients.len(), 3);
         assert_eq!(prompt.coefficients, vec![1.0, 1.1, 1.2]);
@@ -200,7 +209,7 @@ mod tests {
         // Check total nu
         let total = match nu.total.unwrap() {
             NuFormulation::Tabulated(total) => total,
-            _ => panic!("This should be tabulated")
+            _ => panic!("This should be tabulated"),
         };
         assert_eq!(total.table.len(), 2);
         assert_eq!(total.evaluate(1e-11).unwrap(), 1.0);

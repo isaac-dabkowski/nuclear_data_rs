@@ -1,11 +1,11 @@
-use std::ops::{Deref, DerefMut};
 use std::iter::zip;
+use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
 use thiserror::Error;
 
-use crate::interpolation::interpolation_region::{InterpolationRegion, XY};
 use crate::interpolation::InterpolationScheme;
+use crate::interpolation::interpolation_region::{InterpolationRegion, XY};
 
 //=====================================================================
 // An interpolation table contains a list of interpolation regions.
@@ -16,7 +16,7 @@ use crate::interpolation::InterpolationScheme;
 
 // Struct for interpolation table data
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd, Eq)]
-pub struct InterpolationTable ( pub Vec<InterpolationRegion> );
+pub struct InterpolationTable(pub Vec<InterpolationRegion>);
 
 impl Deref for InterpolationTable {
     type Target = Vec<InterpolationRegion>;
@@ -32,16 +32,26 @@ impl DerefMut for InterpolationTable {
 }
 
 impl InterpolationTable {
-    pub fn from_x_and_y(x: Vec<f64>, y: Vec<f64>, interpolation_scheme: InterpolationScheme) -> Self {
+    pub fn from_x_and_y(
+        x: Vec<f64>,
+        y: Vec<f64>,
+        interpolation_scheme: InterpolationScheme,
+    ) -> Self {
         // This function creates a single region interpolation table from x and y vectors
         // Ensure that the x and y vectors are of the same length
         if x.len() != y.len() {
-            panic!("InterpolationTable: A single region interpolation table must have x ({}) and y ({}) vectors of equal length", x.len(), y.len());
+            panic!(
+                "InterpolationTable: A single region interpolation table must have x ({}) and y ({}) vectors of equal length",
+                x.len(),
+                y.len()
+            );
         }
 
-        Self(
-            vec![InterpolationRegion::from_x_and_y(x, y, interpolation_scheme)]
-        )
+        Self(vec![InterpolationRegion::from_x_and_y(
+            x,
+            y,
+            interpolation_scheme,
+        )])
     }
 
     pub fn process(data: &[f64]) -> Self {
@@ -71,8 +81,11 @@ impl InterpolationTable {
         let y_start = x_start + num_data_points;
 
         // Bounds, convert to zero-indexed for sanity
-        let bounds = std::iter::once(0)
-            .chain(data[bounds_start..schemes_start].iter().map(|&val| val.to_bits() as usize - 1));
+        let bounds = std::iter::once(0).chain(
+            data[bounds_start..schemes_start]
+                .iter()
+                .map(|&val| val.to_bits() as usize - 1),
+        );
 
         // Schemes
         let schemes = data[schemes_start..schemes_end]
@@ -80,22 +93,22 @@ impl InterpolationTable {
             .map(|&val| InterpolationScheme::from(val.to_bits() as usize));
 
         // Data points
-        let data_points = zip(
-            data[x_start..y_start].iter(), 
-            data[y_start..].iter()).map(|(x, y)| XY {
-                x: *x,
-                y: *y,
-                }
-        );
+        let data_points = zip(data[x_start..y_start].iter(), data[y_start..].iter())
+            .map(|(x, y)| XY { x: *x, y: *y });
 
         // Create interpolation regions
-        let regions = bounds.clone().zip(bounds.skip(1)).zip(schemes).map(|((start, end), scheme)| {
-            let region_data = data_points.clone().skip(start).take(end - start + 1);
-            InterpolationRegion {
-                data: region_data.collect(),
-                interpolation_scheme: scheme,
-            }
-        });
+        let regions =
+            bounds
+                .clone()
+                .zip(bounds.skip(1))
+                .zip(schemes)
+                .map(|((start, end), scheme)| {
+                    let region_data = data_points.clone().skip(start).take(end - start + 1);
+                    InterpolationRegion {
+                        data: region_data.collect(),
+                        interpolation_scheme: scheme,
+                    }
+                });
 
         InterpolationTable(regions.collect())
     }
@@ -107,12 +120,14 @@ impl InterpolationTable {
         let num_interp_regions = array_containing_table[table_start].to_bits() as usize;
         // If the number of regions is zero, this means we use linear-linear interpolation
         if num_interp_regions == 0 {
-            let num_data_points_per_vec = array_containing_table[table_start + 1].to_bits() as usize;
+            let num_data_points_per_vec =
+                array_containing_table[table_start + 1].to_bits() as usize;
             table_length += 2 + 2 * num_data_points_per_vec;
         } else {
             // We have a list of interpolation parameters and schemes
             table_length += 1 + 2 * num_interp_regions;
-            let num_data_points_per_vec = array_containing_table[table_start + table_length].to_bits() as usize;
+            let num_data_points_per_vec =
+                array_containing_table[table_start + table_length].to_bits() as usize;
             table_length += 1 + 2 * num_data_points_per_vec;
         }
         table_length
@@ -125,12 +140,18 @@ impl InterpolationTable {
             return Err(InterpolationError::InvalidTable());
         }
         // Find the region that x_val falls into
-        let region = self.iter().find(|region| {
-            region.data[0].x <= x_val && x_val <= region.data.iter().last().unwrap().x
-        }).ok_or_else(|| InterpolationError::RegionNotFound(x_val))?;
+        let region = self
+            .iter()
+            .find(|region| {
+                region.data[0].x <= x_val && x_val <= region.data.iter().last().unwrap().x
+            })
+            .ok_or_else(|| InterpolationError::RegionNotFound(x_val))?;
 
         // Find the index of the bin that x_val falls into
-        let idx = match region.data.binary_search_by(|xy| xy.x.partial_cmp(&x_val).unwrap()) {
+        let idx = match region
+            .data
+            .binary_search_by(|xy| xy.x.partial_cmp(&x_val).unwrap())
+        {
             // We are exactly on a data point, exit early by returning the value
             Ok(idx) => return Ok(region.data[idx].y),
             // We are inside a bin
@@ -151,10 +172,16 @@ impl InterpolationTable {
         match &region.interpolation_scheme {
             InterpolationScheme::Histogram => Ok(y0),
             InterpolationScheme::LinLin => Ok(y0 + (y1 - y0) * (x_val - x0) / (x1 - x0)),
-            InterpolationScheme::LinLog => Ok(y0 + (y1 - y0) * (x_val.log10() - x0.log10()) / (x1.log10() - x0.log10())),
-            InterpolationScheme::LogLin => Ok(y0 * ((x_val - x0) * (y1 / y0).ln() / (x1 - x0)).exp()),
-            InterpolationScheme::LogLog => Ok(y0 * ((x_val / x0).ln() * (y1 / y0).ln() / (x1 / x0).ln()).exp()),
-            InterpolationScheme::Gamow => todo!("Gamow interpolation")
+            InterpolationScheme::LinLog => {
+                Ok(y0 + (y1 - y0) * (x_val.log10() - x0.log10()) / (x1.log10() - x0.log10()))
+            }
+            InterpolationScheme::LogLin => {
+                Ok(y0 * ((x_val - x0) * (y1 / y0).ln() / (x1 - x0)).exp())
+            }
+            InterpolationScheme::LogLog => {
+                Ok(y0 * ((x_val / x0).ln() * (y1 / y0).ln() / (x1 / x0).ln()).exp())
+            }
+            InterpolationScheme::Gamow => todo!("Gamow interpolation"),
         }
     }
 }
@@ -168,7 +195,6 @@ pub enum InterpolationError {
     RegionNotFound(f64),
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -176,16 +202,14 @@ mod tests {
 
     #[test]
     fn test_histogram_interpolation() {
-        let table = InterpolationTable(vec![
-            InterpolationRegion {
-                data: vec![
-                    XY { x: 1.0, y: 2.0 },
-                    XY { x: 2.0, y: 4.0 },
-                    XY { x: 3.0, y: 6.0 },
-                ],
-                interpolation_scheme: InterpolationScheme::Histogram,
-            }
-        ]);
+        let table = InterpolationTable(vec![InterpolationRegion {
+            data: vec![
+                XY { x: 1.0, y: 2.0 },
+                XY { x: 2.0, y: 4.0 },
+                XY { x: 3.0, y: 6.0 },
+            ],
+            interpolation_scheme: InterpolationScheme::Histogram,
+        }]);
 
         let result = table.interpolate(1.0).unwrap();
         assert_eq!(result, 2.0);
@@ -203,16 +227,14 @@ mod tests {
 
     #[test]
     fn test_linlin_interpolation() {
-        let table = InterpolationTable(vec![
-            InterpolationRegion {
-                data: vec![
-                    XY { x: 1.0, y: 2.0 },
-                    XY { x: 2.0, y: 4.0 },
-                    XY { x: 3.0, y: 6.0 },
-                ],
-                interpolation_scheme: InterpolationScheme::LinLin,
-            }
-        ]);
+        let table = InterpolationTable(vec![InterpolationRegion {
+            data: vec![
+                XY { x: 1.0, y: 2.0 },
+                XY { x: 2.0, y: 4.0 },
+                XY { x: 3.0, y: 6.0 },
+            ],
+            interpolation_scheme: InterpolationScheme::LinLin,
+        }]);
 
         let result = table.interpolate(1.0).unwrap();
         assert_eq!(result, 2.0);
@@ -230,16 +252,14 @@ mod tests {
 
     #[test]
     fn test_linlog_interpolation() {
-        let table = InterpolationTable(vec![
-            InterpolationRegion {
-                data: vec![
-                    XY { x: 1.0, y: 2.0 },
-                    XY { x: 2.0, y: 5.0 },
-                    XY { x: 3.0, y: 10.0 },
-                ],
-                interpolation_scheme: InterpolationScheme::LinLog,
-            }
-        ]);
+        let table = InterpolationTable(vec![InterpolationRegion {
+            data: vec![
+                XY { x: 1.0, y: 2.0 },
+                XY { x: 2.0, y: 5.0 },
+                XY { x: 3.0, y: 10.0 },
+            ],
+            interpolation_scheme: InterpolationScheme::LinLog,
+        }]);
 
         let result = table.interpolate(1.0).unwrap();
         assert_eq!(result, 2.0);
@@ -257,16 +277,14 @@ mod tests {
 
     #[test]
     fn test_loglin_interpolation() {
-        let table = InterpolationTable(vec![
-            InterpolationRegion {
-                data: vec![
-                    XY { x: 1.0, y: 2.0 },
-                    XY { x: 2.0, y: 5.0 },
-                    XY { x: 3.0, y: 10.0 },
-                ],
-                interpolation_scheme: InterpolationScheme::LogLin,
-            }
-        ]);
+        let table = InterpolationTable(vec![InterpolationRegion {
+            data: vec![
+                XY { x: 1.0, y: 2.0 },
+                XY { x: 2.0, y: 5.0 },
+                XY { x: 3.0, y: 10.0 },
+            ],
+            interpolation_scheme: InterpolationScheme::LogLin,
+        }]);
 
         let result = table.interpolate(1.0).unwrap();
         assert_eq!(result, 2.0);
@@ -284,16 +302,14 @@ mod tests {
 
     #[test]
     fn test_loglog_interpolation() {
-        let table = InterpolationTable(vec![
-            InterpolationRegion {
-                data: vec![
-                    XY { x: 1.0, y: 2.0 },
-                    XY { x: 2.0, y: 5.0 },
-                    XY { x: 3.0, y: 10.0 },
-                ],
-                interpolation_scheme: InterpolationScheme::LogLog,
-            }
-        ]);
+        let table = InterpolationTable(vec![InterpolationRegion {
+            data: vec![
+                XY { x: 1.0, y: 2.0 },
+                XY { x: 2.0, y: 5.0 },
+                XY { x: 3.0, y: 10.0 },
+            ],
+            interpolation_scheme: InterpolationScheme::LogLog,
+        }]);
 
         let result = table.interpolate(1.0).unwrap();
         assert_eq!(result, 2.0);
@@ -313,31 +329,19 @@ mod tests {
     fn test_multiple_interpolation_regions() {
         let table = InterpolationTable(vec![
             InterpolationRegion {
-                data: vec![
-                    XY { x: 1.0, y: 2.0 },
-                    XY { x: 2.0, y: 5.0 },
-                ],
+                data: vec![XY { x: 1.0, y: 2.0 }, XY { x: 2.0, y: 5.0 }],
                 interpolation_scheme: InterpolationScheme::Histogram,
             },
             InterpolationRegion {
-                data: vec![
-                    XY { x: 2.0, y: 5.0 },
-                    XY { x: 3.0, y: 10.0 },
-                ],
+                data: vec![XY { x: 2.0, y: 5.0 }, XY { x: 3.0, y: 10.0 }],
                 interpolation_scheme: InterpolationScheme::LinLin,
             },
             InterpolationRegion {
-                data: vec![
-                    XY { x: 3.0, y: 10.0 },
-                    XY { x: 4.0, y: 5.0 },
-                ],
+                data: vec![XY { x: 3.0, y: 10.0 }, XY { x: 4.0, y: 5.0 }],
                 interpolation_scheme: InterpolationScheme::LinLog,
             },
             InterpolationRegion {
-                data: vec![
-                    XY { x: 4.0, y: 5.0 },
-                    XY { x: 5.0, y: 2.0 },
-                ],
+                data: vec![XY { x: 4.0, y: 5.0 }, XY { x: 5.0, y: 2.0 }],
                 interpolation_scheme: InterpolationScheme::LogLin,
             },
             InterpolationRegion {
@@ -391,16 +395,14 @@ mod tests {
 
     #[test]
     fn test_out_of_bounds_interpolation() {
-        let table = InterpolationTable(vec![
-            InterpolationRegion {
-                data: vec![
-                    XY { x: 1.0, y: 2.0 },
-                    XY { x: 2.0, y: 3.0 },
-                    XY { x: 3.0, y: 4.0 },
-                ],
-                interpolation_scheme: InterpolationScheme::Histogram,
-            }
-        ]);
+        let table = InterpolationTable(vec![InterpolationRegion {
+            data: vec![
+                XY { x: 1.0, y: 2.0 },
+                XY { x: 2.0, y: 3.0 },
+                XY { x: 3.0, y: 4.0 },
+            ],
+            interpolation_scheme: InterpolationScheme::Histogram,
+        }]);
 
         let result = table.interpolate(0.5);
         assert!(result.is_err());
@@ -410,7 +412,8 @@ mod tests {
     fn test_region_instantiation() {
         let x = vec![1.0, 2.0, 3.0];
         let y = vec![2.0, 3.0, 4.0];
-        let region = InterpolationRegion::from_x_and_y(x.clone(), y.clone(), InterpolationScheme::LinLin);
+        let region =
+            InterpolationRegion::from_x_and_y(x.clone(), y.clone(), InterpolationScheme::LinLin);
         assert_eq!(region.data.len(), x.len());
         assert_eq!(region.interpolation_scheme, InterpolationScheme::LinLin);
         for (i, xy) in region.data.iter().enumerate() {
@@ -423,7 +426,8 @@ mod tests {
     fn test_table_instantiation() {
         let x = vec![1.0, 2.0, 3.0];
         let y = vec![2.0, 3.0, 4.0];
-        let table = InterpolationTable::from_x_and_y(x.clone(), y.clone(), InterpolationScheme::LinLin);
+        let table =
+            InterpolationTable::from_x_and_y(x.clone(), y.clone(), InterpolationScheme::LinLin);
         assert_eq!(table.len(), 1);
         assert_eq!(table[0].data.len(), x.len());
         assert_eq!(table[0].interpolation_scheme, InterpolationScheme::LinLin);
@@ -432,5 +436,4 @@ mod tests {
             assert_eq!(xy.y, y[i]);
         }
     }
-
 }

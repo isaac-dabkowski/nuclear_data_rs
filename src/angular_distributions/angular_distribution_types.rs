@@ -3,8 +3,8 @@ use std::ops::Deref;
 use anyhow::Result;
 use thiserror::Error;
 
+use crate::interpolation::{InterpolationError, InterpolationScheme, InterpolationTable};
 use crate::unitf64::UnitF64;
-use crate::interpolation::{InterpolationScheme, InterpolationTable, InterpolationError};
 
 //=====================================================================
 // Trait to sample the cosine of the scattering angle from a given
@@ -29,7 +29,9 @@ impl SampleAngle for AngularDistribution {
         match self {
             AngularDistribution::Isotropic(distribution) => distribution.sample_cos_theta(unitf64),
             AngularDistribution::Tabulated(distribution) => distribution.sample_cos_theta(unitf64),
-            AngularDistribution::EquiprobableBins(distribution) => distribution.sample_cos_theta(unitf64),
+            AngularDistribution::EquiprobableBins(distribution) => {
+                distribution.sample_cos_theta(unitf64)
+            }
         }
     }
 }
@@ -47,12 +49,11 @@ impl SampleAngle for IsotropicAngularDistribution {
     }
 }
 
-
 //=====================================================================
 // Tabulated cosine of the scattering angle with interpolation
 //=====================================================================
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
-pub struct TabulatedAngularDistribution ( pub InterpolationTable );
+pub struct TabulatedAngularDistribution(pub InterpolationTable);
 
 impl Deref for TabulatedAngularDistribution {
     type Target = InterpolationTable;
@@ -71,19 +72,24 @@ impl TabulatedAngularDistribution {
         if interpolation_scheme != InterpolationScheme::Histogram
             && interpolation_scheme != InterpolationScheme::LinLin
         {
-            return Err(TabulatedAngularDistributionError::InvalidInterpolationScheme(interpolation_scheme));
+            return Err(
+                TabulatedAngularDistributionError::InvalidInterpolationScheme(interpolation_scheme),
+            );
         }
         // Ensure that the cos_theta_bins and cos_theta_cdf are of the same length
         if cos_theta_bins.len() != cos_theta_cdf.len() {
-            return Err(TabulatedAngularDistributionError::InvalidDistributionLengths(
-                cos_theta_bins.len(),
-                cos_theta_cdf.len(),
-            ));
+            return Err(
+                TabulatedAngularDistributionError::InvalidDistributionLengths(
+                    cos_theta_bins.len(),
+                    cos_theta_cdf.len(),
+                ),
+            );
         }
         // Build an interpolation table for the cosine of the scattering angle
         // Because we are sampling from a CDF, the x values are the CDF values
         // and the y values are the cos(theta) values.
-        let cos_theta_table = InterpolationTable::from_x_and_y(cos_theta_cdf, cos_theta_bins, interpolation_scheme);
+        let cos_theta_table =
+            InterpolationTable::from_x_and_y(cos_theta_cdf, cos_theta_bins, interpolation_scheme);
         Ok(Self(cos_theta_table))
     }
 }
@@ -103,12 +109,11 @@ pub enum TabulatedAngularDistributionError {
     InvalidDistributionLengths(usize, usize),
 }
 
-
 //=====================================================================
 // Special ACE type, 32 equiprobable bins of cos theta
 //=====================================================================
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
-pub struct EquiprobableBinsAngularDistribution ( pub InterpolationTable );
+pub struct EquiprobableBinsAngularDistribution(pub InterpolationTable);
 
 impl Deref for EquiprobableBinsAngularDistribution {
     type Target = InterpolationTable;
@@ -122,13 +127,20 @@ impl EquiprobableBinsAngularDistribution {
         const CAPACITY: usize = 33; // 32 bins + 1 for the last bin boundary
         // Exactly 33 points are required to define the 32 bins
         if cos_theta_bins.len() != CAPACITY {
-            return Err(EquiprobableBinsAngularDistributionError::InvalidNumberOfBins(CAPACITY, cos_theta_bins.len()));
+            return Err(
+                EquiprobableBinsAngularDistributionError::InvalidNumberOfBins(
+                    CAPACITY,
+                    cos_theta_bins.len(),
+                ),
+            );
         }
 
         // Ensure all cos_theta_bins are in the range [-1, 1]
         for &cos_theta in &cos_theta_bins {
             if cos_theta < -1.0 || cos_theta > 1.0 {
-                return Err(EquiprobableBinsAngularDistributionError::BinOutOfRange(cos_theta));
+                return Err(EquiprobableBinsAngularDistributionError::BinOutOfRange(
+                    cos_theta,
+                ));
             }
         }
 
@@ -143,8 +155,11 @@ impl EquiprobableBinsAngularDistribution {
         // Build an interpolation table for the cosine of the scattering angle
         // Because we are sampling from a CDF, the x values are the CDF values
         // and the y values are the cos(theta) values.
-        let cos_theta_table =
-            InterpolationTable::from_x_and_y(cos_theta_cdf, cos_theta_bins, InterpolationScheme::LinLin);
+        let cos_theta_table = InterpolationTable::from_x_and_y(
+            cos_theta_cdf,
+            cos_theta_bins,
+            InterpolationScheme::LinLin,
+        );
         Ok(Self(cos_theta_table))
     }
 }
@@ -163,7 +178,6 @@ pub enum EquiprobableBinsAngularDistributionError {
     #[error("cos(theta) bin value {0} is out of range [-1, 1]")]
     BinOutOfRange(f64),
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -190,11 +204,9 @@ mod tests {
         let interpolation_scheme = InterpolationScheme::LinLin;
         let cos_theta_bins = vec![-1.0, 0.0, 1.0];
         let cos_theta_cdf = vec![0.0, 0.5, 1.0];
-        let distribution = TabulatedAngularDistribution::new(
-            interpolation_scheme,
-            cos_theta_bins,
-            cos_theta_cdf
-        ).expect("Failed to create TabulatedAngularDistribution");
+        let distribution =
+            TabulatedAngularDistribution::new(interpolation_scheme, cos_theta_bins, cos_theta_cdf)
+                .expect("Failed to create TabulatedAngularDistribution");
 
         let unitf64 = UnitF64(0.0);
         let result = distribution.sample_cos_theta(unitf64).unwrap();
@@ -222,13 +234,18 @@ mod tests {
         let interpolation_scheme = InterpolationScheme::LogLog; // Unsupported scheme
         let cos_theta_bins = vec![-1.0, 0.0, 1.0];
         let cos_theta_cdf = vec![0.0, 0.5, 1.0];
-        assert!(TabulatedAngularDistribution::new(interpolation_scheme, cos_theta_bins, cos_theta_cdf).is_err());
+        assert!(
+            TabulatedAngularDistribution::new(interpolation_scheme, cos_theta_bins, cos_theta_cdf)
+                .is_err()
+        );
     }
 
     #[test]
     fn test_equiprobable_bins_angular_distribution() {
-        let cos_theta_bins: Vec<f64> = Vec::from_iter((0..33).map(|i| i as f64 / (33 - 1) as f64 * 2.0 - 1.0));
-        let distribution = EquiprobableBinsAngularDistribution::new(cos_theta_bins).expect("Failed to create EquiprobableBinsAngularDistribution");
+        let cos_theta_bins: Vec<f64> =
+            Vec::from_iter((0..33).map(|i| i as f64 / (33 - 1) as f64 * 2.0 - 1.0));
+        let distribution = EquiprobableBinsAngularDistribution::new(cos_theta_bins)
+            .expect("Failed to create EquiprobableBinsAngularDistribution");
 
         let unitf64 = UnitF64(0.0);
         let result = distribution.sample_cos_theta(unitf64).unwrap();
@@ -251,7 +268,8 @@ mod tests {
 
     #[test]
     fn test_equiprobable_bins_angular_distribution_out_of_range() {
-        let mut cos_theta_bins: Vec<f64> = Vec::from_iter((0..33).map(|i| i as f64 / (33 - 1) as f64));
+        let mut cos_theta_bins: Vec<f64> =
+            Vec::from_iter((0..33).map(|i| i as f64 / (33 - 1) as f64));
         cos_theta_bins[0] = -1.5;
         assert!(EquiprobableBinsAngularDistribution::new(cos_theta_bins).is_err());
     }

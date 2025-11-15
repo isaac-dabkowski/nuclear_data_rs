@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
-use strum::IntoEnumIterator;
 use anyhow::Result;
+use strum::IntoEnumIterator;
 
 use crate::blocks::BlockType;
 use crate::utils::PaceMmap;
@@ -14,7 +14,7 @@ use crate::utils::PaceMmap;
 //=====================================================================
 #[derive(Clone, Debug, Default)]
 pub struct JxsArray {
-    pub block_starting_indices: HashMap<BlockType, usize>
+    pub block_starting_indices: HashMap<BlockType, usize>,
 }
 
 impl Deref for JxsArray {
@@ -61,16 +61,16 @@ impl JxsArray {
     #[inline]
     fn index_from_data_block_type(block_type: &BlockType) -> usize {
         match block_type {
-            BlockType::ESZ =>  0,
-            BlockType::NU =>  1,
-            BlockType::MTR =>  2,
-            BlockType::LQR =>  3,
-            BlockType::TYR =>  4,
-            BlockType::LSIG =>  5,
-            BlockType::SIG =>  6,
-            BlockType::LAND =>  7,
-            BlockType::AND =>  8,
-            BlockType::LDLW =>  9,
+            BlockType::ESZ => 0,
+            BlockType::NU => 1,
+            BlockType::MTR => 2,
+            BlockType::LQR => 3,
+            BlockType::TYR => 4,
+            BlockType::LSIG => 5,
+            BlockType::SIG => 6,
+            BlockType::LAND => 7,
+            BlockType::AND => 8,
+            BlockType::LDLW => 9,
             BlockType::DLW => 10,
             BlockType::GPD => 11,
             BlockType::MTRP => 12,

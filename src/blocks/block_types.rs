@@ -5,38 +5,37 @@ use strum_macros::{Display, EnumIter};
 //=====================================================================
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EnumIter, Display)]
 pub enum BlockType {
-    ESZ,    // Energy table
-    NU,     // Fission nu data
-    MTR,    // MT array
-    LQR,    // Q-value array
-    TYR,    // Reaction type array
-    LSIG,   // Table of cross section locators
-    SIG,    // Cross sections
-    LAND,   // Table of angular distribution locators
-    AND,    // Angular distributions
-    LDLW,   // Table of energy distribution locators
-    DLW,    // Energy distributions
-    GPD,    // Photon production data
-    MTRP,   // Photon production MT array
-    LSIGP,  // Table of photon production cross section locators
-    SIGP,   // Photon production cross sections
-    LANDP,  // Table of photon production angular distribution locators
-    ANDP,   // Photon production angular distributions
-    LDLWP,  // Table of photon production energy distribution locators
-    DLWP,   // Photon production energy distributions
-    YP,     // Table of yield multipliers
-    FIS,    // Total fission cross section
-    END,    // Last word of the conventional table
-    LUND,   // Probability tables
-    DNU,    // Delayed nu-bar data
-    BDD,    // Basic delayed neutron precursor data
-    DNEDL,  // Table of delayed neutron energy distribution locators
-    DNED,   // Delayed neutron energy distributions
-    PTYPE,  // Particle type array
-    NTRO,   // Array containing number of particle production reactions
-    NEXT,   // Table of particle production locators
+    ESZ,   // Energy table
+    NU,    // Fission nu data
+    MTR,   // MT array
+    LQR,   // Q-value array
+    TYR,   // Reaction type array
+    LSIG,  // Table of cross section locators
+    SIG,   // Cross sections
+    LAND,  // Table of angular distribution locators
+    AND,   // Angular distributions
+    LDLW,  // Table of energy distribution locators
+    DLW,   // Energy distributions
+    GPD,   // Photon production data
+    MTRP,  // Photon production MT array
+    LSIGP, // Table of photon production cross section locators
+    SIGP,  // Photon production cross sections
+    LANDP, // Table of photon production angular distribution locators
+    ANDP,  // Photon production angular distributions
+    LDLWP, // Table of photon production energy distribution locators
+    DLWP,  // Photon production energy distributions
+    YP,    // Table of yield multipliers
+    FIS,   // Total fission cross section
+    END,   // Last word of the conventional table
+    LUND,  // Probability tables
+    DNU,   // Delayed nu-bar data
+    BDD,   // Basic delayed neutron precursor data
+    DNEDL, // Table of delayed neutron energy distribution locators
+    DNED,  // Delayed neutron energy distributions
+    PTYPE, // Particle type array
+    NTRO,  // Array containing number of particle production reactions
+    NEXT,  // Table of particle production locators
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -95,7 +94,6 @@ mod tests {
 
     #[test]
     fn test_hash() {
-
         let mut hasher = DefaultHasher::new();
         BlockType::ESZ.hash(&mut hasher);
         let hash1 = hasher.finish();

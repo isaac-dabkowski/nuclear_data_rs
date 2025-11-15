@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::arrays::Arrays;
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
 use crate::blocks::{BlockType, MTR};
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
 
 //=====================================================================
 // TYR data block
@@ -13,7 +13,7 @@ use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFro
 // reactions.
 //=====================================================================
 #[derive(Debug, Clone, PartialEq)]
-pub struct TYR ( pub HashMap<usize, ExitingNeutronData> );
+pub struct TYR(pub HashMap<usize, ExitingNeutronData>);
 
 impl Deref for TYR {
     type Target = HashMap<usize, ExitingNeutronData>;
@@ -51,13 +51,17 @@ impl<'a> Process<'a> for TYR {
         let neutron_release: HashMap<usize, ExitingNeutronData> = data
             .iter()
             .enumerate()
-            .map(|(i, &val)| (
-                mtr.as_ref().unwrap()[i],
-                ExitingNeutronData {
-                    neutron_release: NumberOfExitingNeutrons::from(val.to_bits() as isize),
-                    frame_of_reference: ExitingNeutronFrameOfReference::from(val.to_bits() as isize),
-                }
-            ))
+            .map(|(i, &val)| {
+                (
+                    mtr.as_ref().unwrap()[i],
+                    ExitingNeutronData {
+                        neutron_release: NumberOfExitingNeutrons::from(val.to_bits() as isize),
+                        frame_of_reference: ExitingNeutronFrameOfReference::from(
+                            val.to_bits() as isize
+                        ),
+                    },
+                )
+            })
             .collect();
 
         Self(neutron_release)
@@ -67,7 +71,9 @@ impl<'a> Process<'a> for TYR {
 impl<'a> TYR {
     pub fn mt_values_with_neutron_release(&self) -> Vec<usize> {
         self.iter()
-            .filter(|(_, exit_neutron_data)| exit_neutron_data.neutron_release != NumberOfExitingNeutrons::Absorption)
+            .filter(|(_, exit_neutron_data)| {
+                exit_neutron_data.neutron_release != NumberOfExitingNeutrons::Absorption
+            })
             .map(|(mt, _)| *mt)
             .collect()
     }
@@ -88,7 +94,7 @@ impl std::fmt::Display for TYR {
 pub enum NumberOfExitingNeutrons {
     Discrete(usize),
     EnergyDependent,
-    Absorption
+    Absorption,
 }
 // Produces a NumberOfExitingNeutrons from an isize value
 // 0 = Absorption, +/- (1-4 = Discrete, 19 = EnergyDependent, > 100 = EnergyDependent)
@@ -102,7 +108,10 @@ impl From<isize> for NumberOfExitingNeutrons {
             4 => NumberOfExitingNeutrons::Discrete(4),
             n if n > 100 || n == 19 => NumberOfExitingNeutrons::EnergyDependent,
             _ => {
-                panic!("Invalid value in TYR describing neutron release, allowable values are 0, +/- 1-4, 19, and > 100, found: {}", value)
+                panic!(
+                    "Invalid value in TYR describing neutron release, allowable values are 0, +/- 1-4, 19, and > 100, found: {}",
+                    value
+                )
             }
         }
     }
@@ -113,7 +122,7 @@ impl From<isize> for NumberOfExitingNeutrons {
 pub enum ExitingNeutronFrameOfReference {
     CenterOfMass,
     Laboratory,
-    NoRelease
+    NoRelease,
 }
 // Produces a ExitingNeutronFrameOfReference from an isize value
 impl From<isize> for ExitingNeutronFrameOfReference {
@@ -122,7 +131,10 @@ impl From<isize> for ExitingNeutronFrameOfReference {
             0 => ExitingNeutronFrameOfReference::NoRelease,
             n if n > 0 => ExitingNeutronFrameOfReference::Laboratory,
             n if n < 0 => ExitingNeutronFrameOfReference::CenterOfMass,
-            _ => panic!("Unexpected value for ExitingNeutronFrameOfReference: {}", value),
+            _ => panic!(
+                "Unexpected value for ExitingNeutronFrameOfReference: {}",
+                value
+            ),
         }
     }
 }
@@ -143,11 +155,10 @@ impl From<isize> for ExitingNeutronData {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{utils::get_parsed_test_file, helpers::MTNumber};
+    use crate::{helpers::MTNumber, utils::get_parsed_test_file};
 
     #[tokio::test]
     async fn test_tyr_parsing() {

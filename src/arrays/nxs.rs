@@ -13,13 +13,13 @@ pub struct NxsArray {
     pub za: usize,      // ZA of isotope
     pub nes: usize,     // Number of energies
     pub ntr: usize,     // Number of reactions excluding elastic scattering
-    pub nr: usize,      // Number of reactions having secondary neutrons excluding elastic scattering
-    pub ntrp: usize,    // Number of photon production reactions
-    pub ntype: usize,   // Number of particle types for which production data is given
-    pub npcr: usize,    // Number of delayed neutron precurser families
-    pub s: usize,       // Excited state (>2.0.0 Header only)
-    pub z: usize,       // Atomic number (>2.0.0 Header only)
-    pub a: usize,       // Atomic mass number (>2.0.0 Header only)
+    pub nr: usize, // Number of reactions having secondary neutrons excluding elastic scattering
+    pub ntrp: usize, // Number of photon production reactions
+    pub ntype: usize, // Number of particle types for which production data is given
+    pub npcr: usize, // Number of delayed neutron precurser families
+    pub s: usize,  // Excited state (>2.0.0 Header only)
+    pub z: usize,  // Atomic number (>2.0.0 Header only)
+    pub a: usize,  // Atomic mass number (>2.0.0 Header only)
 }
 
 impl NxsArray {

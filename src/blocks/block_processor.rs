@@ -1,22 +1,13 @@
 use std::error::Error;
+
+#[cfg(test)]
 use std::time::Instant;
 
-use crate::utils::PaceMmap;
-use crate::blocks::{
-    ESZ,
-    MTR,
-    LSIG,
-    SIG,
-    LQR,
-    NU,
-    DNU,
-    BDD,
-    TYR,
-    LAND,
-    AND, // Ensure AND implements a trait for dynamic dispatch
-};
-use crate::blocks::block_traits::Parse;
 use crate::arrays::{Arrays, JxsArray, NxsArray, XxsArray};
+use crate::blocks::block_traits::Parse;
+use crate::blocks::{AND, BDD, DNU, ESZ, LAND, LQR, LSIG, MTR, NU, SIG, TYR};
+use crate::time_it;
+use crate::utils::PaceMmap;
 
 #[derive(Clone, Debug, Default)]
 pub struct DataBlocks {
@@ -34,7 +25,11 @@ pub struct DataBlocks {
 }
 
 impl DataBlocks {
-    pub fn from_PACE(mmap: &PaceMmap, nxs_array: &NxsArray, jxs_array: &JxsArray) -> Result<Self, Box<dyn Error>> {
+    pub fn from_PACE(
+        mmap: &PaceMmap,
+        nxs_array: &NxsArray,
+        jxs_array: &JxsArray,
+    ) -> Result<Self, Box<dyn Error>> {
         // Recall that this array is returned as f64's, we will parse these values back to
         // integers where appropriate later
         let xxs_array: &XxsArray = mmap.xxs_array();
@@ -51,112 +46,55 @@ impl DataBlocks {
         // Blocks which are always present
         // -------------------------------
         // Energy grid
-        let mut start = Instant::now();
-        let esz = ESZ::parse(&arrays, ());
-        println!(
-            "⚛️  ESZ time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let esz = time_it!("ESZ", ESZ::parse(&arrays, ()));
 
         // -------------------------------------------
         // Blocks present if isotope has reactions
         // other than elastic scattering (NXS(4) != 0)
         // -------------------------------------------
         // Reaction MT values
-        start = Instant::now();
-        let mtr = MTR::parse(&arrays, ());
-        println!(
-            "⚛️  MTR time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let mtr = time_it!("MTR", MTR::parse(&arrays, ()));
         // Q values
-        start = Instant::now();
-        let lqr = LQR::parse(&arrays, &mtr);
-        println!(
-            "⚛️  LQR time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let lqr = time_it!("LQR", LQR::parse(&arrays, &mtr));
         // Cross section locations
-        start = Instant::now();
-        let lsig = LSIG::parse(&arrays, ());
-        println!(
-            "⚛️  LSIG time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let lsig = time_it!("LSIG", LSIG::parse(&arrays, ()));
         // Cross section values
-        start = Instant::now();
-        let sig = SIG::parse(&arrays, (&mtr, &lsig, &esz));
-        println!(
-            "⚛️  SIG time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let sig = time_it!("SIG", SIG::parse(&arrays, (&mtr, &lsig, &esz)));
         // Secondary neutron information
-        start = Instant::now();
-        let tyr = TYR::parse(&arrays, &mtr);
-        println!(
-            "⚛️  TYR time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let tyr = time_it!("TYR", TYR::parse(&arrays, &mtr));
 
         // -------------------------------------------
         // Blocks present if fission nu data is
         // available (JXS(2) != 0)
         // -------------------------------------------
         // Fission nu values
-        start = Instant::now();
-        let nu = NU::parse(&arrays, ());
-        println!(
-            "⚛️  NU time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let nu = time_it!("NU", NU::parse(&arrays, ()));
         // Fission dnu values
-        start = Instant::now();
-        let dnu = DNU::parse(&arrays, ());
-        println!(
-            "⚛️  DNU time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let dnu = time_it!("DNU", DNU::parse(&arrays, ()));
         // Fission precursor data values
-        start = Instant::now();
-        let bdd = BDD::parse(&arrays, ());
-        println!(
-            "⚛️  BDD time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let bdd = time_it!("BDD", BDD::parse(&arrays, ()));
 
         // --------------------------------------------------------------------------------
         // Blocks which are always present, but where having MTR makes them easier to parse
         // --------------------------------------------------------------------------------
         // Secondary neutron angular distribution locations
-        start = Instant::now();
-        let land = LAND::parse(&arrays, &mtr);
-        println!(
-            "⚛️  LAND time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let land = time_it!("LAND", LAND::parse(&arrays, &mtr));
         // Secondary neutron angular distributions
-        start = Instant::now();
-        let and = AND::parse(&arrays, (&tyr, &land));
-        println!(
-            "⚛️  AND time ⚛️ : {} us",
-            start.elapsed().as_micros()
-        );
+        let and = time_it!("AND", AND::parse(&arrays, (&tyr, &land)));
 
-        Ok(
-            Self {
-                ESZ: esz,
-                MTR: mtr,
-                LSIG: lsig,
-                SIG: sig,
-                LQR: lqr,
-                DNU: dnu,
-                NU: nu,
-                BDD: bdd,
-                TYR: tyr,
-                LAND: land,
-                AND: and,
-            }
-        )
+        Ok(Self {
+            ESZ: esz,
+            MTR: mtr,
+            LSIG: lsig,
+            SIG: sig,
+            LQR: lqr,
+            DNU: dnu,
+            NU: nu,
+            BDD: bdd,
+            TYR: tyr,
+            LAND: land,
+            AND: and,
+        })
     }
 }
 

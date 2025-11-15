@@ -1,15 +1,18 @@
 #![allow(non_snake_case, clippy::upper_case_acronyms)]
 
-mod angular_distributions;
-mod arrays;
-mod blocks;
-mod header;
-mod interpolation;
-mod pace_data;
-mod utils;
+pub mod angular_distributions;
+pub mod arrays;
+pub mod blocks;
+pub mod header;
+pub mod interpolation;
+pub mod pace_data;
+pub mod utils;
 
-mod isotope;
-mod helpers;
-mod unitf64;
+pub mod helpers;
+pub mod isotope;
+pub mod unitf64;
 
+pub use arrays::{Arrays, IzawArray, JxsArray, NxsArray, XxsArray};
+pub use blocks::{AND, LAND, MTR, TYR};
 pub use isotope::Isotope;
+pub use pace_data::PaceData;

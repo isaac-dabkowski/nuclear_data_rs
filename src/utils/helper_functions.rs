@@ -1,8 +1,8 @@
 #![allow(clippy::await_holding_lock, dead_code)]
 
-use std::io::{BufReader, BufRead};
-use std::fs::File;
 use anyhow::Result;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 //====================================================================
 // Assorted helper functions.
@@ -11,7 +11,8 @@ use anyhow::Result;
 // Read a specified number of lines into a BufReader
 #[inline]
 pub fn read_lines(reader: &mut BufReader<File>, num_lines: usize) -> Result<Vec<String>> {
-    reader.lines()
+    reader
+        .lines()
         .take(num_lines)
         .map(|line| line.map_err(anyhow::Error::from))
         .collect::<Result<Vec<_>>>()

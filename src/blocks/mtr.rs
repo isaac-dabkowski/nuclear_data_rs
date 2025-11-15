@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use crate::arrays::Arrays;
 use crate::blocks::BlockType;
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
 
 //=====================================================================
 // MTR data block
@@ -12,7 +12,7 @@ use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFro
 // the MTR block
 //=====================================================================
 #[derive(Debug, Clone, PartialEq)]
-pub struct MTR( pub Vec<usize> );
+pub struct MTR(pub Vec<usize>);
 
 impl Deref for MTR {
     type Target = Vec<usize>;

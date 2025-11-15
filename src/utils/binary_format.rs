@@ -5,12 +5,12 @@ use std::{
     sync::Mutex,
 };
 
-use rayon::prelude::*;
-use memmap2::MmapOptions;
 use anyhow::{Context, Result};
+use memmap2::MmapOptions;
+use rayon::prelude::*;
 
-use crate::utils;
 use crate::header::Header;
+use crate::utils;
 
 //=====================================================================
 // Infrastructure to convert an ASCII ACE file into our own "PACE"
@@ -47,7 +47,7 @@ use crate::header::Header;
 // zero-copy conversions to appropriate types from the raw bytes in
 // these slices.
 //=====================================================================
-pub struct PaceMmap ( memmap2::Mmap );
+pub struct PaceMmap(memmap2::Mmap);
 
 impl PaceMmap {
     // Take a pre-existing PACE file and map it into memory.
@@ -75,7 +75,7 @@ impl PaceMmap {
         // A JXS array consists of 16 integers
         let nxs_array = &self.0[304..432];
         // Zero-copy Conversion to usize
-        unsafe { 
+        unsafe {
             std::slice::from_raw_parts(nxs_array.as_ptr() as *const usize, nxs_array.len() / 8)
         }
     }
@@ -85,21 +85,23 @@ impl PaceMmap {
         // A JXS array consists of 32 integers.
         let jxs_array = &self.0[432..688];
         // Zero-copy conversion to usize
-        unsafe { 
+        unsafe {
             std::slice::from_raw_parts(jxs_array.as_ptr() as *const usize, jxs_array.len() / 8)
         }
     }
-    
+
     // Pull the XXS array, interpreted as f64
     pub fn xxs_array(&self) -> &[f64] {
         let xxs_array_bytes = &self.0[688..];
         // Zero-copy conversion to f64
         unsafe {
-            std::slice::from_raw_parts(xxs_array_bytes.as_ptr() as *const f64, xxs_array_bytes.len() / 8)
+            std::slice::from_raw_parts(
+                xxs_array_bytes.as_ptr() as *const f64,
+                xxs_array_bytes.len() / 8,
+            )
         }
     }
 }
-
 
 // Parse a line of the ASCII ACE file into tokens.
 // This function is unsafe because it assumes that the input line is
@@ -127,13 +129,13 @@ unsafe fn parse_tokens_from_line(line: &str) -> Vec<&str> {
         unsafe {
             let token_ptr = bytes.as_ptr().add(start + trim_start);
             let token_len = 20 - trim_start;
-            let token = std::str::from_utf8_unchecked(std::slice::from_raw_parts(token_ptr, token_len));
+            let token =
+                std::str::from_utf8_unchecked(std::slice::from_raw_parts(token_ptr, token_len));
             tokens.push(token);
         }
     }
     tokens
 }
-
 
 // This function converts an ASCII ACE file into a PACE binary file.
 pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
@@ -142,8 +144,12 @@ pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
     let mut reader = BufReader::new(input_file);
 
     // Parse the header using the existing `from_ACE` method
-    let header = Header::from_ACE(&mut reader)
-        .with_context(|| format!("Failed to read header from ASCII ACE file {} while trying to convert to PACE file", input_path.as_ref().display()))?;
+    let header = Header::from_ACE(&mut reader).with_context(|| {
+        format!(
+            "Failed to read header from ASCII ACE file {} while trying to convert to PACE file",
+            input_path.as_ref().display()
+        )
+    })?;
 
     // Set the PACE file name to the SZAID if it is available. Otherwise, set it to the ZAID.
     let output_filename = if let Some(ref val) = header.szaid {
@@ -152,10 +158,7 @@ pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
         format!("{}.pace", header.zaid)
     };
     let output_filename = Path::new(&output_filename);
-    let output_path = input_path.as_ref()
-        .parent()
-        .unwrap()
-        .join(output_filename);
+    let output_path = input_path.as_ref().parent().unwrap().join(output_filename);
 
     // Create output file for writing (mutable from the start)
     let output_file = File::create(output_path.clone())?;
@@ -169,7 +172,7 @@ pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
                 let padding_length = 16 - val.len();
                 output_file.write_all(val.as_bytes())?;
                 output_file.write_all(&vec![b' '; padding_length])?;
-            },
+            }
             None => {
                 output_file.write_all(&vec![b' '; 16])?;
             }
@@ -200,7 +203,10 @@ pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
                 let mut output_file = output_file.lock().unwrap();
                 output_file.write_all(&float.to_ne_bytes())?;
             } else {
-                return Err(anyhow::anyhow!(format!("Invalid token format: '{}'", token)));
+                return Err(anyhow::anyhow!(format!(
+                    "Invalid token format: '{}'",
+                    token
+                )));
             }
         }
     }
@@ -220,7 +226,10 @@ pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
                     } else if let Ok(float) = token.parse::<f64>() {
                         local_buffer.extend_from_slice(&float.to_ne_bytes());
                     } else {
-                        panic!("Invalid token \"{}\" when trying to convert ASCII to binary", token); // Skip invalid tokens
+                        panic!(
+                            "Invalid token \"{}\" when trying to convert ASCII to binary",
+                            token
+                        ); // Skip invalid tokens
                     }
                 }
             }

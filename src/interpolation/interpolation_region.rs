@@ -22,15 +22,30 @@ pub struct InterpolationRegion {
 }
 
 impl InterpolationRegion {
-    pub fn from_x_and_y(x: Vec<f64>, y: Vec<f64>, interpolation_scheme: InterpolationScheme) -> Self {
+    pub fn from_x_and_y(
+        x: Vec<f64>,
+        y: Vec<f64>,
+        interpolation_scheme: InterpolationScheme,
+    ) -> Self {
         // Ensure that the x and y vectors are of the same length
         if x.len() != y.len() {
-            panic!("InterpolationRegion: x ({}) and y ({}) vectors must be of the same length", x.len(), y.len());
+            panic!(
+                "InterpolationRegion: x ({}) and y ({}) vectors must be of the same length",
+                x.len(),
+                y.len()
+            );
         }
 
         // Zip the x and y vectors together into a vector of XY structs
-        let data = x.into_iter().zip(y.into_iter()).map(|(x, y)| XY { x, y }).collect();
+        let data = x
+            .into_iter()
+            .zip(y.into_iter())
+            .map(|(x, y)| XY { x, y })
+            .collect();
 
-        Self { data, interpolation_scheme }
+        Self {
+            data,
+            interpolation_scheme,
+        }
     }
 }

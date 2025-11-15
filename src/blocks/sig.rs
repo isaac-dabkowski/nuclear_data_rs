@@ -1,13 +1,13 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Mutex;
-use std::collections::HashMap;
 
 use rayon::prelude::*;
 
-use crate::helpers::reaction_type_from_MT;
 use crate::arrays::Arrays;
-use crate::blocks::{BlockType, ESZ, MTR, LSIG};
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
+use crate::blocks::{BlockType, ESZ, LSIG, MTR};
+use crate::helpers::reaction_type_from_MT;
 
 //=====================================================================
 // SIG data block
@@ -16,7 +16,7 @@ use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFro
 // the ACE format spec for a description of the SIG block.
 //=====================================================================
 #[derive(Debug, Clone)]
-pub struct SIG ( pub CrossSectionMap );
+pub struct SIG(pub CrossSectionMap);
 
 impl Deref for SIG {
     type Target = CrossSectionMap;
@@ -57,7 +57,11 @@ impl<'a> PullFromXXS<'a> for SIG {
 impl<'a> Process<'a> for SIG {
     type Dependencies = (&'a Option<MTR>, &'a Option<LSIG>, &'a Option<ESZ>);
 
-    fn process(data: &[f64], _arrays: &Arrays, dependencies: (&Option<MTR>, &Option<LSIG>, &Option<ESZ>)) -> Self {
+    fn process(
+        data: &[f64],
+        _arrays: &Arrays,
+        dependencies: (&Option<MTR>, &Option<LSIG>, &Option<ESZ>),
+    ) -> Self {
         let (mtr, lsig, esz) = (
             dependencies.0.as_ref().unwrap(),
             dependencies.1.as_ref().unwrap(),
@@ -67,21 +71,32 @@ impl<'a> Process<'a> for SIG {
         let xs = Mutex::new(CrossSectionMap::default()); // Use Mutex for thread-safe access
 
         // Parallelize the loop over cross sections using par_iter()
-        mtr.par_iter().zip(lsig.par_iter()).for_each(|(mt, start_pos)| {
-            // Get the first position in the energy grid where we have a cross section value
-            let energy_start_index: usize = data[start_pos - 1].to_bits() as usize;
-            // Get the number of entries we have for the cross section
-            let num_xs_values: usize = data[*start_pos].to_bits() as usize;
+        mtr.par_iter()
+            .zip(lsig.par_iter())
+            .for_each(|(mt, start_pos)| {
+                // Get the first position in the energy grid where we have a cross section value
+                let energy_start_index: usize = data[start_pos - 1].to_bits() as usize;
+                // Get the number of entries we have for the cross section
+                let num_xs_values: usize = data[*start_pos].to_bits() as usize;
 
-            // Get the cross section values
-            let xs_val = Vec::from(&data[start_pos + 1..start_pos + 1 + num_xs_values]);
-            // Get the corresponding energy values
-            let energy = Vec::from(&esz.energy[energy_start_index - 1..(energy_start_index - 1 + num_xs_values)]);
-        
-            // Lock the Mutex and insert into the CrossSectionMap
-            let mut xs_lock = xs.lock().unwrap();
-            xs_lock.insert(*mt, CrossSection { mt: *mt, energy, xs_val });
-        });
+                // Get the cross section values
+                let xs_val = Vec::from(&data[start_pos + 1..start_pos + 1 + num_xs_values]);
+                // Get the corresponding energy values
+                let energy = Vec::from(
+                    &esz.energy[energy_start_index - 1..(energy_start_index - 1 + num_xs_values)],
+                );
+
+                // Lock the Mutex and insert into the CrossSectionMap
+                let mut xs_lock = xs.lock().unwrap();
+                xs_lock.insert(
+                    *mt,
+                    CrossSection {
+                        mt: *mt,
+                        energy,
+                        xs_val,
+                    },
+                );
+            });
 
         Self(xs.into_inner().unwrap())
     }
@@ -91,7 +106,8 @@ impl std::fmt::Display for SIG {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sorted_xs: Vec<CrossSection> = self.values().cloned().collect();
         sorted_xs.sort_by_key(|xs| xs.mt);
-        let xs_string = sorted_xs.iter()
+        let xs_string = sorted_xs
+            .iter()
             .map(|xs| format!("{}", xs))
             .collect::<Vec<String>>()
             .join(", ");
@@ -113,10 +129,14 @@ pub struct CrossSection {
 
 impl<'a> std::fmt::Display for CrossSection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CrossSection(MT={} {})", self.mt, reaction_type_from_MT(self.mt))
+        write!(
+            f,
+            "CrossSection(MT={} {})",
+            self.mt,
+            reaction_type_from_MT(self.mt)
+        )
     }
 }
-
 
 #[cfg(test)]
 mod tests {

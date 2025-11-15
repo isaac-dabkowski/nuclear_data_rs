@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use crate::arrays::Arrays;
 use crate::blocks::BlockType;
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
 
 //=====================================================================
 // LSIG data block
@@ -11,7 +11,7 @@ use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFro
 // ACE format spec for a description of the LSIG block.
 //=====================================================================
 #[derive(Debug, Clone, PartialEq)]
-pub struct LSIG ( pub Vec<usize> );
+pub struct LSIG(pub Vec<usize>);
 
 impl Deref for LSIG {
     type Target = Vec<usize>;
@@ -33,7 +33,7 @@ impl<'a> PullFromXXS<'a> for LSIG {
             has_xs_other_than_elastic,
             "LSIG is expected if NXS(4) (NTR) != 0, but LSIG was not found.".to_string(),
         )?;
-        
+
         // Calculate the block length, see the LSIG description in the ACE spec
         let num_reactions = arrays.nxs.ntr;
         let block_length = num_reactions;
