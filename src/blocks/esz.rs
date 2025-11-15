@@ -1,6 +1,6 @@
 use crate::arrays::Arrays;
 use crate::blocks::BlockType;
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
 
 //=====================================================================
 // ESZ data block
@@ -50,7 +50,8 @@ impl<'a> Process<'a> for ESZ {
         let total_xs = Vec::from(&data[num_energy_points..2 * num_energy_points]);
         let dissapearance_xs = Vec::from(&data[2 * num_energy_points..3 * num_energy_points]);
         let elastic_xs = Vec::from(&data[3 * num_energy_points..4 * num_energy_points]);
-        let average_heating_numbers = Vec::from(&data[4 * num_energy_points..5 * num_energy_points]);
+        let average_heating_numbers =
+            Vec::from(&data[4 * num_energy_points..5 * num_energy_points]);
         Self {
             energy,
             total_xs,

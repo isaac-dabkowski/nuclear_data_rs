@@ -1,10 +1,9 @@
-
 use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::arrays::Arrays;
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
 use crate::blocks::{BlockType, MTR};
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
 
 //=====================================================================
 // LQR data block
@@ -13,7 +12,7 @@ use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFro
 // spec for a description of the LQR block.
 //=====================================================================
 #[derive(Debug, Clone, PartialEq)]
-pub struct LQR ( pub HashMap<usize, f64> );
+pub struct LQR(pub HashMap<usize, f64>);
 
 impl Deref for LQR {
     type Target = HashMap<usize, f64>;
@@ -49,7 +48,12 @@ impl<'a> Process<'a> for LQR {
     type Dependencies = &'a Option<MTR>;
 
     fn process(data: &[f64], _arrays: &Arrays, mtr: &Option<MTR>) -> Self {
-        Self(data.iter().enumerate().map(|(i, &q)| (mtr.as_ref().unwrap()[i], q)).collect())
+        Self(
+            data.iter()
+                .enumerate()
+                .map(|(i, &q)| (mtr.as_ref().unwrap()[i], q))
+                .collect(),
+        )
     }
 }
 

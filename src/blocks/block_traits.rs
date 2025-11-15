@@ -53,11 +53,7 @@ pub trait Parse<'a>: PullFromXXS<'a> + Process<'a> {
     }
 }
 
-impl<'a, T> Parse<'a> for T
-where
-    T: Process<'a> + PullFromXXS<'a>,
-{}
-
+impl<'a, T> Parse<'a> for T where T: Process<'a> + PullFromXXS<'a> {}
 
 //=====================================================================
 // Helper functions to make working with the XXS array easier.
@@ -68,7 +64,12 @@ where
 // indicating whether or not the block is expected to be present, and we panic if the block
 // is not present when it is expected, or if the block is present when it is not expected,
 // both of which are indicative of a bug in the code or a serious error in the PACE file.
-pub fn get_block_start(block_type: &BlockType, arrays: &Arrays, is_expected: bool, panic_message: String) -> Option<usize> {
+pub fn get_block_start(
+    block_type: &BlockType,
+    arrays: &Arrays,
+    is_expected: bool,
+    panic_message: String,
+) -> Option<usize> {
     // If the block type's start index is non-zero, the block is present in the XXS array
     let start_index = arrays.jxs.get(block_type);
     // The block is expected
@@ -80,7 +81,7 @@ pub fn get_block_start(block_type: &BlockType, arrays: &Arrays, is_expected: boo
             // The block is present, return the start index
             // Note that the XXS array in the PACE binary format is zero
             // indexed (which does not match the ACE spec)
-           return Some(start_index - 1);
+            return Some(start_index - 1);
         }
     // The block is not expected
     } else {
@@ -94,7 +95,11 @@ pub fn get_block_start(block_type: &BlockType, arrays: &Arrays, is_expected: boo
     }
 }
 
-pub fn block_range_to_slice<'a>(block_start: usize, block_length: usize, arrays: &'a Arrays) -> &'a [f64] {
+pub fn block_range_to_slice<'a>(
+    block_start: usize,
+    block_length: usize,
+    arrays: &'a Arrays,
+) -> &'a [f64] {
     let mut block_end = block_start + block_length;
     if block_end == arrays.xxs.len() + 1 {
         block_end -= 1;

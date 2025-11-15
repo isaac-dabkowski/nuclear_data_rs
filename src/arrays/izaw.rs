@@ -8,20 +8,20 @@ use crate::utils::PaceMmap;
 //=====================================================================
 #[derive(Clone, Debug)]
 pub struct IzawArray {
-    pub pairs: Vec<IzawPair>
+    pub pairs: Vec<IzawPair>,
 }
 
 impl IzawArray {
     pub fn from_PACE(mmap: &PaceMmap) -> Result<Self> {
-        let pairs = mmap.izaw_bytes().chunks_exact(16)
-            .map(
-                |chunk| {
-                    IzawPair::new(
-                        usize::from_ne_bytes(chunk[0..8].try_into().unwrap()),
-                        f64::from_ne_bytes(chunk[8..16].try_into().unwrap())
-                    )
-                }
-            )
+        let pairs = mmap
+            .izaw_bytes()
+            .chunks_exact(16)
+            .map(|chunk| {
+                IzawPair::new(
+                    usize::from_ne_bytes(chunk[0..8].try_into().unwrap()),
+                    f64::from_ne_bytes(chunk[8..16].try_into().unwrap()),
+                )
+            })
             .collect::<Vec<_>>();
         Ok(Self { pairs })
     }
@@ -30,8 +30,8 @@ impl IzawArray {
 // Pair of values used in S alpha beta calculations
 #[derive(Debug, Clone, PartialEq)]
 pub struct IzawPair {
-    pub za: usize,  // ZA of isotope
-    pub iz: f64,    // Atomic weight ratio
+    pub za: usize, // ZA of isotope
+    pub iz: f64,   // Atomic weight ratio
 }
 
 impl IzawPair {
@@ -39,7 +39,6 @@ impl IzawPair {
         Self { za, iz }
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -1,7 +1,7 @@
 use crate::arrays::Arrays;
-use crate::interpolation::InterpolationTable;
 use crate::blocks::BlockType;
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
+use crate::interpolation::InterpolationTable;
 
 //=====================================================================
 // BDD data block
@@ -13,7 +13,7 @@ use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFro
 #[derive(Debug, Clone, Default)]
 pub struct BDD {
     pub decay_constants: Vec<f64>,
-    pub precursor_tables: Vec<InterpolationTable>
+    pub precursor_tables: Vec<InterpolationTable>,
 }
 
 impl<'a> PullFromXXS<'a> for BDD {
@@ -36,7 +36,8 @@ impl<'a> PullFromXXS<'a> for BDD {
             // Account for the decay constant
             block_length += 1;
             // Get the length of the precursor group data
-            let precursor_group_data_length = InterpolationTable::get_table_length(block_start + block_length, arrays.xxs);
+            let precursor_group_data_length =
+                InterpolationTable::get_table_length(block_start + block_length, arrays.xxs);
             block_length += precursor_group_data_length;
         }
 
@@ -60,11 +61,16 @@ impl<'a> Process<'a> for BDD {
             offset += 1;
             // Construct the interpolation table which describes probabilities for the precursor group
             let precursor_group_data_length = InterpolationTable::get_table_length(offset, &data);
-            precursor_tables.push(InterpolationTable::process(&data[offset..offset+precursor_group_data_length]));
+            precursor_tables.push(InterpolationTable::process(
+                &data[offset..offset + precursor_group_data_length],
+            ));
             offset += precursor_group_data_length;
         }
 
-        BDD {decay_constants, precursor_tables}
+        BDD {
+            decay_constants,
+            precursor_tables,
+        }
     }
 }
 
@@ -86,9 +92,6 @@ mod tests {
         let bdd = parsed_ace.data_blocks.BDD.unwrap();
         assert_eq!(bdd.decay_constants.len(), 6);
         assert_eq!(bdd.precursor_tables.len(), 6);
-        assert_eq!(
-            bdd.decay_constants,
-            vec![0.01, 0.03, 0.05, 0.09, 0.3, 0.5]
-        );
+        assert_eq!(bdd.decay_constants, vec![0.01, 0.03, 0.05, 0.09, 0.3, 0.5]);
     }
 }

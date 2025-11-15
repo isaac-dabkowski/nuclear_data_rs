@@ -1,21 +1,40 @@
 #![allow(clippy::await_holding_lock, unused)]
 
 //=====================================================================
-// Utility functions to aid in accelerating testing
+// Utility functions to aid in testing
 //=====================================================================
 
-use std::sync::Mutex;
-use std::io::{self, Read, Write, Seek, BufReader, BufRead};
-use std::path::Path;
-use std::fs::File;
+use anyhow::{Context, Result};
+use lazy_static::lazy_static;
 use std::error::Error;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Read, Seek, Write};
+use std::path::Path;
+use std::sync::Mutex;
 use std::time::Instant;
 use tempfile::tempfile;
-use lazy_static::lazy_static;
-use anyhow::{Context, Result};
 
 use crate::pace_data::PaceData;
 use crate::utils::binary_format::convert_ACE_to_PACE;
+
+// Helper macro: in tests, time a parse and print; in other builds, just
+// evaluate the expression without any timing or println noise.
+#[cfg(test)]
+#[macro_export]
+macro_rules! time_it {
+    ($label:expr, $expr:expr) => {{
+        let start = Instant::now();
+        let result = $expr;
+        println!("⚛️  {}  ⚛️ : {} μs", $label, start.elapsed().as_micros());
+        result
+    }};
+}
+
+#[cfg(not(test))]
+#[macro_export]
+macro_rules! time_it {
+    ($label:expr, $expr:expr) => {{ $expr }};
+}
 
 // These variables are used to hold filepaths in a way where
 // they are accesible to all tests in all files, and where
@@ -25,14 +44,12 @@ lazy_static! {
     pub static ref TEST_PACE_DATA: Mutex<Option<PaceData>> = Mutex::new(None);
     pub static ref TEST_ACE_COMMENTED: &'static str = "test_nuclear_data_files/test_ascii_ace";
     pub static ref TEST_ACE_UNCOMMENTED: &'static str = "test_nuclear_data_files/test_ascii_ace.no_comment";
-    pub static ref TEST_PACE: &'static str = "test_nuclear_data_files/binary_1100.800nc";
+    pub static ref TEST_PACE: &'static str = "test_nuclear_data_files/1100.800nc.pace";
 
     // For local testing
     pub static ref LOCAL_TEST_PACE_DATA: Mutex<Option<PaceData>> = Mutex::new(None);
-    pub static ref LOCAL_TEST_ACE: &'static str = "test_files/uranium_test_file";
-    pub static ref LOCAL_TEST_PACE: &'static str = "test_files/binary_92235.800nc";
-    // pub static ref LOCAL_TEST_ACE: &'static str = "test_files/hydrogen_test_file";
-    // pub static ref LOCAL_TEST_PACE: &'static str = "test_files/binary_1001.800nc";
+    pub static ref LOCAL_TEST_ACE: &'static str = "local_test_files/uranium_test_file";
+    pub static ref LOCAL_TEST_PACE: &'static str = "local_test_files/92235.800nc.pace";
 }
 
 // Checks if a file is ASCII by reading the first 1 kB of the file
@@ -43,9 +60,9 @@ pub fn is_ascii_file<P: AsRef<Path>>(path: P) -> Result<bool> {
 
     match reader.read(&mut buffer)? {
         0 => Ok(true),
-        n => Ok(!buffer[..n].iter().any(|&byte| 
-            byte >= 128 || (byte < 32 && !matches!(byte, 9 | 10 | 13))
-        ))
+        n => Ok(!buffer[..n]
+            .iter()
+            .any(|&byte| byte >= 128 || (byte < 32 && !matches!(byte, 9 | 10 | 13)))),
     }
 }
 
@@ -76,7 +93,8 @@ fn uncomment_ace_test_file() -> Result<()> {
 pub async fn local_get_parsed_test_file() -> PaceData {
     // In effect, this acts as a sloppy integration test as it involves
     // the parsing of an actual ASCII ACE file.
-    let mut data: std::sync::MutexGuard<'_, Option<PaceData>> = LOCAL_TEST_PACE_DATA.lock().unwrap();
+    let mut data: std::sync::MutexGuard<'_, Option<PaceData>> =
+        LOCAL_TEST_PACE_DATA.lock().unwrap();
 
     // Only parse the ACE file if it is not already parsed
     if data.is_none() {

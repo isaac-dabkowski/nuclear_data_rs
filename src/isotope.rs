@@ -1,2 +1,1 @@
-pub struct Isotope {
-}
+pub struct Isotope {}

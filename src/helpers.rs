@@ -93,7 +93,7 @@ pub fn reaction_type_from_MT(mt: usize) -> String {
         891 => "(z,2nc)".to_string(),
         1002 => "S(α,β)".to_string(),
         1004 => "S(α,β)".to_string(),
-        _ => format!("(unknown MT={})", mt)
+        _ => format!("(unknown MT={})", mt),
     }
 }
 
@@ -192,8 +192,17 @@ pub fn reaction_particles(mt: usize) -> (String, String) {
     } else if reaction_description.contains("unknown") {
         ("?".to_string(), "?".to_string())
     } else {
-        let incident_particle = reaction_description[1..].split(",").next().unwrap().to_string();
-        let outgoing_particle = reaction_description.split(",").nth(1).unwrap().trim_end_matches(")").to_string();
+        let incident_particle = reaction_description[1..]
+            .split(",")
+            .next()
+            .unwrap()
+            .to_string();
+        let outgoing_particle = reaction_description
+            .split(",")
+            .nth(1)
+            .unwrap()
+            .trim_end_matches(")")
+            .to_string();
         (incident_particle, outgoing_particle)
     }
 }
@@ -319,7 +328,7 @@ pub fn element_from_Z(Z: usize) -> String {
         116 => String::from("Lv"),
         117 => String::from("Ts"),
         118 => String::from("Og"),
-        _ => String::from("Unknown")
+        _ => String::from("Unknown"),
     }
 }
 

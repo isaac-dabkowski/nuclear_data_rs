@@ -1,9 +1,9 @@
 use anyhow::Result;
 
 use crate::arrays::Arrays;
-use crate::interpolation::InterpolationTable;
 use crate::blocks::BlockType;
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
+use crate::interpolation::InterpolationTable;
 
 //=====================================================================
 // DNU data block
@@ -12,7 +12,7 @@ use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFro
 // per fission.
 //=====================================================================
 #[derive(Debug, Clone, Default)]
-pub struct DNU (InterpolationTable);
+pub struct DNU(InterpolationTable);
 
 impl DNU {
     // Evaluate the tabulated nu at an energy (given in MeV)
@@ -36,7 +36,8 @@ impl<'a> PullFromXXS<'a> for DNU {
 
         // Calculate the block length, see the DNU description in the ACE spec
         let mut block_length = 1;
-        block_length += InterpolationTable::get_table_length(block_start + block_length, arrays.xxs);
+        block_length +=
+            InterpolationTable::get_table_length(block_start + block_length, arrays.xxs);
 
         // Return the block's raw data as a slice
         Some(block_range_to_slice(block_start, block_length, arrays))

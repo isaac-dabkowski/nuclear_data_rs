@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use crate::arrays::Arrays;
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
 use crate::blocks::{BlockType, MTR, TYR};
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
 use crate::helpers::MTNumber;
 
 //=====================================================================
@@ -13,7 +13,7 @@ use crate::helpers::MTNumber;
 // which produce secondary neutrons.
 //=====================================================================
 #[derive(Debug, Clone, PartialEq)]
-pub struct LAND ( pub HashMap<usize, isize> );
+pub struct LAND(pub HashMap<usize, isize>);
 
 impl Deref for LAND {
     type Target = HashMap<usize, isize>;
@@ -35,7 +35,7 @@ impl<'a> PullFromXXS<'a> for LAND {
             always_expected,
             "LAND is always expected, but LAND was not found.".to_string(),
         )?;
-        
+
         // Calculate the block length, see the LAND description in the ACE spec
         // We will always have data for elastic scattering, so we need to add 1 to the number of reactions
         let block_length = arrays.nxs.nr + 1;
@@ -54,19 +54,19 @@ impl<'a> Process<'a> for LAND {
             data[1..]
                 .iter()
                 .enumerate()
-                .map(|(i, &val)| (
-                    mtr.as_ref().unwrap()[i],
-                    val.to_bits() as isize
-                ))
+                .map(|(i, &val)| (mtr.as_ref().unwrap()[i], val.to_bits() as isize))
                 .collect()
         } else {
             HashMap::new()
         };
-        
-        // We will always have an angular distribution for elastic scattering
-        angular_distribution_locs.insert(MTNumber::ElasticScattering as usize, data[0].to_bits() as isize);
 
-        Self ( angular_distribution_locs )
+        // We will always have an angular distribution for elastic scattering
+        angular_distribution_locs.insert(
+            MTNumber::ElasticScattering as usize,
+            data[0].to_bits() as isize,
+        );
+
+        Self(angular_distribution_locs)
     }
 }
 
@@ -98,7 +98,7 @@ impl std::fmt::Display for LAND {
 
 #[cfg(test)]
 mod tests {
-    use crate::{utils::get_parsed_test_file, helpers::MTNumber};
+    use crate::{helpers::MTNumber, utils::get_parsed_test_file};
 
     #[tokio::test]
     async fn test_land_parsing() {

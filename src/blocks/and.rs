@@ -3,20 +3,16 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use crate::arrays::Arrays;
-use crate::blocks::{BlockType, TYR, LAND};
-use crate::blocks::block_traits::{get_block_start, block_range_to_slice, PullFromXXS, Process};
-use crate::interpolation::InterpolationScheme;
 use crate::angular_distributions::{
-    AngularDistribution,
-    IsotropicAngularDistribution,
-    TabulatedAngularDistribution,
-    EquiprobableBinsAngularDistribution,
-    EnergyDependentAngularDistribution,
+    AngularDistribution, EnergyDependentAngularDistribution, EquiprobableBinsAngularDistribution,
+    IsotropicAngularDistribution, TabulatedAngularDistribution,
 };
+use crate::arrays::Arrays;
+use crate::blocks::block_traits::{Process, PullFromXXS, block_range_to_slice, get_block_start};
+use crate::blocks::{BlockType, LAND, TYR};
+use crate::interpolation::InterpolationScheme;
 
 type AngularDistributionMap = HashMap<usize, EnergyDependentAngularDistribution>;
-
 
 //=====================================================================
 // AND data block
@@ -25,7 +21,7 @@ type AngularDistributionMap = HashMap<usize, EnergyDependentAngularDistribution>
 // which produce secondary neutrons.
 //=====================================================================
 #[derive(Debug, Clone)]
-pub struct AND ( pub AngularDistributionMap);
+pub struct AND(pub AngularDistributionMap);
 
 impl<'a> Deref for AND {
     type Target = AngularDistributionMap;
@@ -71,7 +67,9 @@ impl<'a> PullFromXXS<'a> for AND {
         // Following the energy grid, we have (Ne) location identifiers for the angular distributions,
         // we will pull these and find the maximum value from the list. This is the location of the last
         // angular distribution for the last entry in the AND block.
-        let last_and_final_entry_maximum_relative_index = arrays.xxs[last_and_entry_start + last_and_num_energies..last_and_entry_start + 2 * last_and_num_energies]
+        let last_and_final_entry_maximum_relative_index = arrays.xxs[last_and_entry_start
+            + last_and_num_energies
+            ..last_and_entry_start + 2 * last_and_num_energies]
             .iter()
             .map(|&x| x.to_bits() as isize)
             .filter(|&x| x != 0)
@@ -84,43 +82,51 @@ impl<'a> PullFromXXS<'a> for AND {
                 // If the maximum distribution locator for all energies in the last entry is zero, then it was isotropic for
                 // all energies and no distribution is provided.
                 0
-            },
+            }
             n if n < 0 => {
                 // If the locator is negative, we have a tabulated scattering distribution.
                 // Get the number points in the distribution.
-                let num_points = arrays.xxs[block_start + last_and_final_entry_maximum_relative_index.abs() as usize].to_bits() as usize;
+                let num_points = arrays.xxs
+                    [block_start + last_and_final_entry_maximum_relative_index.abs() as usize]
+                    .to_bits() as usize;
                 // The tables length past the realtive index is 3 times the number of points,
                 // since we have the scattering cosine values, a PDF, and a CDF.
                 3 * num_points
-            },
+            }
             n if n > 0 => {
                 // If the locator is positive, we have a 32 equiprobable bin distribution, which means
                 // we have 33 points to define the bins.
                 33
-            },
+            }
             _ => {
                 // The last entry is not isotropic for all energies and a distribution is provided.
                 // We will set the last entry to be the start of the last distribution's final energy point.
-                panic!("Unexpected value for last AND distribution locator: {}", last_and_final_entry_maximum_relative_index);
+                panic!(
+                    "Unexpected value for last AND distribution locator: {}",
+                    last_and_final_entry_maximum_relative_index
+                );
             }
         };
 
         // We can now calculate the length of the AND block.
-        let block_length = last_and_final_entry_maximum_relative_index.abs() as usize + last_distribution_length + 1;
+        let block_length = last_and_final_entry_maximum_relative_index.abs() as usize
+            + last_distribution_length
+            + 1;
 
-    // Return the block's raw data as a slice
-    Some(block_range_to_slice(block_start, block_length, arrays))
+        // Return the block's raw data as a slice
+        Some(block_range_to_slice(block_start, block_length, arrays))
     }
 }
 
 impl<'a> Process<'a> for AND {
     type Dependencies = (&'a Option<TYR>, &'a Option<LAND>);
 
-    fn process(data: &[f64], _arrays: &Arrays, dependencies: (&Option<TYR>, &Option<LAND>)) -> Self {
-        let (tyr, land) = (
-            dependencies.0,
-            dependencies.1.clone().unwrap(),
-        );
+    fn process(
+        data: &[f64],
+        _arrays: &Arrays,
+        dependencies: (&Option<TYR>, &Option<LAND>),
+    ) -> Self {
+        let (tyr, land) = (dependencies.0, dependencies.1.clone().unwrap());
 
         let mut distributions = AngularDistributionMap::new();
 
@@ -132,8 +138,9 @@ impl<'a> Process<'a> for AND {
             // If the index is 0, we have an isotropic distribution for all energies
             if mt_index == &0 {
                 // Create an isotropic angular distribution for all energies
-                distributions.insert(*mt,
-                    EnergyDependentAngularDistribution::new_fully_isotropic()
+                distributions.insert(
+                    *mt,
+                    EnergyDependentAngularDistribution::new_fully_isotropic(),
                 );
                 continue;
             }
@@ -149,7 +156,8 @@ impl<'a> Process<'a> for AND {
             // Pull the energy values at which we have angular distributions
             let energy = (&data[energy_range]).to_vec();
             // Get the angular distribution locators for this reaction
-            let distribution_locators = &data[locators_range].iter()
+            let distribution_locators = &data[locators_range]
+                .iter()
                 .map(|&x| x.to_bits() as isize)
                 .collect::<Vec<isize>>();
 
@@ -157,34 +165,37 @@ impl<'a> Process<'a> for AND {
             let mut angular_distributions = Vec::new();
             for &locator in distribution_locators {
                 // Make the proper angular distribution based on the locator value
-                let distribution  = match locator {
+                let distribution = match locator {
                     // If the locator is negative, we have a tabulated scattering distribution
                     n if n < 0 => {
                         // The first index is the interpolation scheme
                         let start_index = locator.abs() as usize - 1;
-                        let tabulated_angular_distribution = make_tabulated_distribution_from_data(&data, start_index);
+                        let tabulated_angular_distribution =
+                            make_tabulated_distribution_from_data(&data, start_index);
                         // Create the angular distribution
                         AngularDistribution::Tabulated(tabulated_angular_distribution)
-                    },
+                    }
                     // If the locator is positive, we have a 32-bin equiprobable distribution
                     n if n > 0 => {
                         let cos_theta_bins = &data[locator as usize..locator as usize + 33];
                         AngularDistribution::EquiprobableBins(
-                            EquiprobableBinsAngularDistribution::new(cos_theta_bins.to_vec()).unwrap()
+                            EquiprobableBinsAngularDistribution::new(cos_theta_bins.to_vec())
+                                .unwrap(),
                         )
-                    },
+                    }
                     // If the locator is zero, we have an isotropic distribution
                     _ => AngularDistribution::Isotropic(IsotropicAngularDistribution {}),
                 };
                 angular_distributions.push(distribution);
             }
-            
+
             // Insert the energy dependent angular distribution into the map
-            distributions.insert(*mt,
+            distributions.insert(
+                *mt,
                 EnergyDependentAngularDistribution {
                     energy: energy,
                     distributions: angular_distributions,
-                }
+                },
             );
         }
 
@@ -198,7 +209,10 @@ impl std::fmt::Display for AND {
     }
 }
 
-fn make_tabulated_distribution_from_data(data: &[f64], start_index: usize) -> TabulatedAngularDistribution {
+fn make_tabulated_distribution_from_data(
+    data: &[f64],
+    start_index: usize,
+) -> TabulatedAngularDistribution {
     // First, get the interpolation scheme
     let interpolation_scheme = InterpolationScheme::from(data[start_index].to_bits() as usize);
     // Next, get the number of points in the distribution
@@ -217,15 +231,16 @@ fn make_tabulated_distribution_from_data(data: &[f64], start_index: usize) -> Ta
         interpolation_scheme,
         cos_theta_values.to_vec(),
         cos_theta_cdf_values.to_vec(),
-    ).unwrap()
+    )
+    .unwrap()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::utils::get_parsed_test_file;
     use crate::helpers::MTNumber;
+    use crate::utils::get_parsed_test_file;
 
     #[tokio::test]
     async fn test_and_parsing() {
@@ -258,26 +273,39 @@ mod tests {
         let scatter_dist = and.get(&(MTNumber::ElasticScattering as usize)).unwrap();
         let fission_dist = and.get(&(MTNumber::Fission as usize)).unwrap();
 
-        let isotropic_distribution = AngularDistribution::Isotropic(IsotropicAngularDistribution {});
+        let isotropic_distribution =
+            AngularDistribution::Isotropic(IsotropicAngularDistribution {});
         let tabulated_distribution1 = AngularDistribution::Tabulated(
             TabulatedAngularDistribution::new(
                 InterpolationScheme::LinLin,
                 vec![-1.0, 0.0, 1.0],
                 vec![0.0, 0.5, 1.0],
-            ).unwrap()
+            )
+            .unwrap(),
         );
         let tabulated_distribution2 = AngularDistribution::Tabulated(
             TabulatedAngularDistribution::new(
                 InterpolationScheme::LinLin,
                 vec![0.0, 0.25, 0.5, 0.75, 1.0],
                 vec![0.0, 0.25, 0.5, 0.75, 1.0],
-            ).unwrap()
+            )
+            .unwrap(),
         );
 
         // Check that the energy values are correct
         assert_eq!(scatter_dist.distributions.len(), 3);
-        assert_eq!(scatter_dist.distributions, vec![tabulated_distribution1, tabulated_distribution2, isotropic_distribution.clone()]);
+        assert_eq!(
+            scatter_dist.distributions,
+            vec![
+                tabulated_distribution1,
+                tabulated_distribution2,
+                isotropic_distribution.clone()
+            ]
+        );
         assert_eq!(fission_dist.distributions.len(), 2);
-        assert_eq!(fission_dist.distributions, vec![isotropic_distribution.clone(), isotropic_distribution]);
+        assert_eq!(
+            fission_dist.distributions,
+            vec![isotropic_distribution.clone(), isotropic_distribution]
+        );
     }
 }

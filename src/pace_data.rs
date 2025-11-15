@@ -1,11 +1,11 @@
-use std::path::Path;
 use std::error::Error;
+use std::path::Path;
 
-use crate::utils::{is_ascii_file, PaceMmap};
-use crate::header::Header;
 use crate::arrays::{IzawArray, JxsArray, NxsArray};
 use crate::blocks::DataBlocks;
+use crate::header::Header;
 use crate::helpers;
+use crate::utils::{PaceMmap, is_ascii_file};
 
 #[derive(Clone)]
 pub struct PaceData {
@@ -13,7 +13,7 @@ pub struct PaceData {
     pub izaw_array: IzawArray,
     pub nxs_array: NxsArray,
     pub jxs_array: JxsArray,
-    pub data_blocks: DataBlocks
+    pub data_blocks: DataBlocks,
 }
 
 impl PaceData {
@@ -23,11 +23,12 @@ impl PaceData {
         // If we have an ASCII file, request that it first be parsed to our own binary format
         // using crate::ace::binary_format::convert_ascii_to_binary
         if is_ascii_file(path)? {
-            return Err(
-                format!(
-                    "File {} is ASCII, this should first be converted to binary format with \
-                    crate::ace::binary_format::convert_ascii_to_binary", path.display()).into()
+            return Err(format!(
+                "File {} is ASCII, this should first be converted to binary format with \
+                    crate::ace::binary_format::convert_ascii_to_binary",
+                path.display()
             )
+            .into());
         }
 
         // We have a binary file, so we can proceed with parsing it
@@ -49,7 +50,13 @@ impl PaceData {
         // Process the blocks out of the XXS array
         let data_blocks = DataBlocks::from_PACE(&mmap, &nxs_array, &jxs_array)?;
 
-        Ok(Self { header, izaw_array, nxs_array, jxs_array, data_blocks})
+        Ok(Self {
+            header,
+            izaw_array,
+            nxs_array,
+            jxs_array,
+            data_blocks,
+        })
     }
 
     // ZAID of the isotope

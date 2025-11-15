@@ -32,10 +32,7 @@ impl Header {
 
         // Logic for pulling SZAID if the ASCII file has a version >2.0.0 header
         let (szaid, legacy_header) = if header[0].contains("2.0.") {
-            let szaid = header[0]
-                .split_whitespace()
-                .nth(1)
-                .map(|s| s.to_string());
+            let szaid = header[0].split_whitespace().nth(1).map(|s| s.to_string());
             // We will get the remaining data from the legacy header
             let legacy_header = utils::read_lines(reader, 2)?;
             (szaid, legacy_header)
@@ -53,14 +50,21 @@ impl Header {
         let kT: f64 = split_legacy_header[2].parse()?;
         let temperature = utils::compute_temperature_from_kT(kT);
 
-        Ok(Self { zaid, szaid, atomic_mass_fraction, kT, temperature })
+        Ok(Self {
+            zaid,
+            szaid,
+            atomic_mass_fraction,
+            kT,
+            temperature,
+        })
     }
 
     pub fn from_PACE(mmap: &utils::PaceMmap) -> Result<Self> {
         let header_bytes = mmap.header_bytes();
         let mut offset = 0;
         // Read SZAID (first 16 bytes)
-        let szaid_str = String::from_utf8(header_bytes[offset..offset + 16].trim_ascii_end().to_vec()).unwrap();
+        let szaid_str =
+            String::from_utf8(header_bytes[offset..offset + 16].trim_ascii_end().to_vec()).unwrap();
         offset += 16;
 
         let szaid = {
@@ -72,11 +76,13 @@ impl Header {
         };
 
         // Read ZAID (next 16 bytes), cast to String
-        let zaid = String::from_utf8(header_bytes[offset..offset + 16].trim_ascii_end().to_vec()).unwrap();
+        let zaid =
+            String::from_utf8(header_bytes[offset..offset + 16].trim_ascii_end().to_vec()).unwrap();
         offset += 16;
 
         // Read atomic mass fraction, cast to f64
-        let atomic_mass_fraction = f64::from_ne_bytes(header_bytes[offset..offset + 8].try_into().unwrap());
+        let atomic_mass_fraction =
+            f64::from_ne_bytes(header_bytes[offset..offset + 8].try_into().unwrap());
         offset += 8;
 
         // Read kT, cast to f64
@@ -95,12 +101,11 @@ impl Header {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{BufReader, Seek, Write};
     use tempfile::tempfile;
-    use std::io::{Write, Seek, BufReader};
 
     #[tokio::test]
     async fn test_2_0_1_header_parsing() {
