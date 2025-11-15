@@ -1,7 +1,7 @@
 /target
 
 # Local testing files
-/test_files
+/local_test_files
 
 # Test files generated from the commented ACE ASCII file
 /test_nuclear_data_files/test_ascii_ace.no_comment
