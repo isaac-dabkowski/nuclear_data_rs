@@ -25,10 +25,10 @@ pub fn default_benchmark_config() -> Criterion {
 //=====================================================================
 
 #[cfg(feature = "local")]
-const TEST_PACE_PATH: &str = "local_test_files/92235.800nc.pace";
+pub const TEST_PACE_PATH: &str = "local_test_files/92235.800nc.pace";
 
 #[cfg(not(feature = "local"))]
-const TEST_PACE_PATH: &str = "test_nuclear_data_files/1100.800nc.pace";
+pub const TEST_PACE_PATH: &str = "test_nuclear_data_files/1100.800nc.pace";
 
 // Returns the cached `PaceData` parsed from `TEST_PACE_PATH`.
 pub fn cached_pace_data() -> &'static PaceData {

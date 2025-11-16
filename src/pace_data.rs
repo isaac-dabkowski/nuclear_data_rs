@@ -14,6 +14,7 @@ pub struct PaceData {
     pub nxs_array: NxsArray,
     pub jxs_array: JxsArray,
     pub data_blocks: DataBlocks,
+    pub name: String,
 }
 
 impl PaceData {
@@ -50,25 +51,28 @@ impl PaceData {
         // Process the blocks out of the XXS array
         let data_blocks = DataBlocks::from_PACE(&mmap, &nxs_array, &jxs_array)?;
 
+        let name = helpers::isotope_name_from_Z_A(nxs_array.z, nxs_array.a);
+
         Ok(Self {
             header,
             izaw_array,
             nxs_array,
             jxs_array,
             data_blocks,
+            name,
         })
     }
 
     // ZAID of the isotope
     #[inline]
-    pub fn zaid(&self) -> String {
-        self.header.zaid.clone()
+    pub fn zaid(&self) -> &str {
+        &self.header.zaid
     }
 
     // SZAID of the isotope (version 2.0.0 and later)
     #[inline]
-    pub fn szaid(&self) -> Option<String> {
-        self.header.szaid.clone()
+    pub fn szaid(&self) -> Option<&str> {
+        self.header.szaid.as_deref()
     }
 
     // Atomic mass fraction
@@ -109,8 +113,8 @@ impl PaceData {
 
     // Isotope name
     #[inline]
-    pub fn name(&self) -> String {
-        helpers::isotope_name_from_Z_A(self.z(), self.a())
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -144,13 +148,13 @@ mod tests {
     #[tokio::test]
     async fn test_szaid_parsing() {
         let parsed_ace = get_parsed_test_file().await;
-        assert_eq!(parsed_ace.szaid(), Some(String::from("1100.800nc")));
+        assert_eq!(parsed_ace.szaid(), Some("1100.800nc"));
     }
 
     #[tokio::test]
     async fn test_zaid_parsing() {
         let parsed_ace = get_parsed_test_file().await;
-        assert_eq!(parsed_ace.zaid(), String::from("1100.00c"));
+        assert_eq!(parsed_ace.zaid(), "1100.00c");
     }
 
     #[tokio::test]
