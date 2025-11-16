@@ -126,7 +126,7 @@ impl<'a> Process<'a> for AND {
         _arrays: &Arrays,
         dependencies: (&Option<TYR>, &Option<LAND>),
     ) -> Self {
-        let (tyr, land) = (dependencies.0, dependencies.1.clone().unwrap());
+        let (tyr, land) = (dependencies.0, dependencies.1.as_ref().expect("LAND is required"));
 
         let mut distributions = AngularDistributionMap::new();
 
@@ -154,38 +154,14 @@ impl<'a> Process<'a> for AND {
             let locators_range = mt_index + num_energy_points..mt_index + 2 * num_energy_points;
 
             // Pull the energy values at which we have angular distributions
-            let energy = (&data[energy_range]).to_vec();
-            // Get the angular distribution locators for this reaction
-            let distribution_locators = &data[locators_range]
-                .iter()
-                .map(|&x| x.to_bits() as isize)
-                .collect::<Vec<isize>>();
+            let energy = data[energy_range].to_vec();
 
             // Loop over the locators and create the angular distributions
-            let mut angular_distributions = Vec::new();
-            for &locator in distribution_locators {
-                // Make the proper angular distribution based on the locator value
-                let distribution = match locator {
-                    // If the locator is negative, we have a tabulated scattering distribution
-                    n if n < 0 => {
-                        // The first index is the interpolation scheme
-                        let start_index = locator.abs() as usize - 1;
-                        let tabulated_angular_distribution =
-                            make_tabulated_distribution_from_data(&data, start_index);
-                        // Create the angular distribution
-                        AngularDistribution::Tabulated(tabulated_angular_distribution)
-                    }
-                    // If the locator is positive, we have a 32-bin equiprobable distribution
-                    n if n > 0 => {
-                        let cos_theta_bins = &data[locator as usize..locator as usize + 33];
-                        AngularDistribution::EquiprobableBins(
-                            EquiprobableBinsAngularDistribution::new(cos_theta_bins.to_vec())
-                                .unwrap(),
-                        )
-                    }
-                    // If the locator is zero, we have an isotropic distribution
-                    _ => AngularDistribution::Isotropic(IsotropicAngularDistribution {}),
-                };
+            let locator_slice = &data[locators_range];
+            let mut angular_distributions = Vec::with_capacity(num_energy_points);
+            for &raw in locator_slice {
+                let locator = raw.to_bits() as isize;
+                let distribution = distribution_from_locator(locator, data);
                 angular_distributions.push(distribution);
             }
 
@@ -206,6 +182,28 @@ impl<'a> Process<'a> for AND {
 impl std::fmt::Display for AND {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "AND({} reactions)", self.len())
+    }
+}
+
+fn distribution_from_locator(locator: isize, data: &[f64]) -> AngularDistribution {
+    match locator {
+        // If the locator is negative, we have a tabulated scattering distribution
+        n if n < 0 => {
+            // The first index is the interpolation scheme
+            let start_index = locator.unsigned_abs() as usize - 1;
+            let tabulated = make_tabulated_distribution_from_data(data, start_index);
+            AngularDistribution::Tabulated(tabulated)
+        }
+        // If the locator is positive, we have a 32-bin equiprobable distribution
+        n if n > 0 => {
+            let idx = locator as usize;
+            let cos_theta_bins = &data[idx..idx + 33];
+            AngularDistribution::EquiprobableBins(
+                EquiprobableBinsAngularDistribution::new(cos_theta_bins.to_vec()).unwrap(),
+            )
+        }
+        // If the locator is zero, we have an isotropic distribution
+        _ => AngularDistribution::Isotropic(IsotropicAngularDistribution {}),
     }
 }
 
