@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::sync::Mutex;
 
 use rayon::prelude::*;
 
@@ -62,43 +61,54 @@ impl<'a> Process<'a> for SIG {
         _arrays: &Arrays,
         dependencies: (&Option<MTR>, &Option<LSIG>, &Option<ESZ>),
     ) -> Self {
-        let (mtr, lsig, esz) = (
-            dependencies.0.as_ref().unwrap(),
-            dependencies.1.as_ref().unwrap(),
-            dependencies.2.as_ref().unwrap(),
-        );
+        let mtr = dependencies
+            .0
+            .as_ref()
+            .expect("MTR is required to construct SIG");
+        let lsig = dependencies
+            .1
+            .as_ref()
+            .expect("LSIG is required to construct SIG");
+        let esz = dependencies
+            .2
+            .as_ref()
+            .expect("ESZ is required to construct SIG");
 
-        let xs = Mutex::new(CrossSectionMap::default()); // Use Mutex for thread-safe access
-
-        // Parallelize the loop over cross sections using par_iter()
-        mtr.par_iter()
+        // Build one CrossSection per (MT, LSIG) pair in parallel, then collect.
+        let entries: Vec<(usize, CrossSection)> = mtr
+            .par_iter()
             .zip(lsig.par_iter())
-            .for_each(|(mt, start_pos)| {
-                // Get the first position in the energy grid where we have a cross section value
-                let energy_start_index: usize = data[start_pos - 1].to_bits() as usize;
-                // Get the number of entries we have for the cross section
-                let num_xs_values: usize = data[*start_pos].to_bits() as usize;
+            .map(|(mt, start_pos)| {
+                let sig_start = *start_pos;
 
-                // Get the cross section values
-                let xs_val = Vec::from(&data[start_pos + 1..start_pos + 1 + num_xs_values]);
-                // Get the corresponding energy values
-                let energy = Vec::from(
-                    &esz.energy[energy_start_index - 1..(energy_start_index - 1 + num_xs_values)],
-                );
+                // Index of the first energy point in ESZ.energy for this XS
+                let energy_start_index: usize = data[sig_start - 1].to_bits() as usize;
+                // Number of XS values for this reaction
+                let num_xs_values: usize = data[sig_start].to_bits() as usize;
 
-                // Lock the Mutex and insert into the CrossSectionMap
-                let mut xs_lock = xs.lock().unwrap();
-                xs_lock.insert(
+                // Cross-section values
+                let xs_slice = &data[sig_start + 1..sig_start + 1 + num_xs_values];
+                let xs_val = xs_slice.to_vec();
+
+                // Corresponding energy values
+                let energy_start = energy_start_index - 1;
+                let energy_slice =
+                    &esz.energy[energy_start..energy_start + num_xs_values];
+                let energy = energy_slice.to_vec();
+
+                (
                     *mt,
                     CrossSection {
                         mt: *mt,
                         energy,
                         xs_val,
                     },
-                );
-            });
+                )
+            })
+            .collect();
 
-        Self(xs.into_inner().unwrap())
+        let xs: CrossSectionMap = entries.into_iter().collect();
+        Self(xs)
     }
 }
 
@@ -127,7 +137,7 @@ pub struct CrossSection {
     pub xs_val: Vec<f64>,
 }
 
-impl<'a> std::fmt::Display for CrossSection {
+impl std::fmt::Display for CrossSection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
