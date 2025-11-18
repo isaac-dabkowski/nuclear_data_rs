@@ -1,18 +1,16 @@
-#![allow(clippy::await_holding_lock, unused)]
+#![allow(unused)]
 
 //=====================================================================
 // Utility functions to aid in testing
 //=====================================================================
 
 use anyhow::{Context, Result};
-use lazy_static::lazy_static;
-use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Seek, Write};
 use std::path::Path;
-use std::sync::Mutex;
 use std::time::Instant;
-use tempfile::tempfile;
+use tempfile::NamedTempFile;
+use tokio::sync::OnceCell;
 
 use crate::pace_data::PaceData;
 use crate::utils::binary_format::convert_ACE_to_PACE;
@@ -36,21 +34,17 @@ macro_rules! time_it {
     ($label:expr, $expr:expr) => {{ $expr }};
 }
 
-// These variables are used to hold filepaths in a way where
-// they are accesible to all tests in all files, and where
-// they can be parsed once and reused in all tests.
-lazy_static! {
-    // For custom ACE file available to all tests
-    pub static ref TEST_PACE_DATA: Mutex<Option<PaceData>> = Mutex::new(None);
-    pub static ref TEST_ACE_COMMENTED: &'static str = "test_nuclear_data_files/test_ascii_ace";
-    pub static ref TEST_ACE_UNCOMMENTED: &'static str = "test_nuclear_data_files/test_ascii_ace.no_comment";
-    pub static ref TEST_PACE: &'static str = "test_nuclear_data_files/1100.800nc.pace";
+// These constants and cells hold test file paths and parsed `PaceData`
+// so that they are available to all tests and parsed only once.
 
-    // For local testing
-    pub static ref LOCAL_TEST_PACE_DATA: Mutex<Option<PaceData>> = Mutex::new(None);
-    pub static ref LOCAL_TEST_ACE: &'static str = "local_test_files/uranium_test_file";
-    pub static ref LOCAL_TEST_PACE: &'static str = "local_test_files/92235.800nc.pace";
-}
+static TEST_PACE_DATA: OnceCell<PaceData> = OnceCell::const_new();
+
+#[cfg(not(feature = "local"))]
+pub const TEST_ACE: &str = "test_nuclear_data_files/test_ascii_ace";
+
+// For local testing (enabled with the `local` feature)
+#[cfg(feature = "local")]
+pub const TEST_ACE: &str = "local_test_files/uranium_test_file";
 
 // Checks if a file is ASCII by reading the first 1 kB of the file
 pub fn is_ascii_file<P: AsRef<Path>>(path: P) -> Result<bool> {
@@ -67,83 +61,66 @@ pub fn is_ascii_file<P: AsRef<Path>>(path: P) -> Result<bool> {
 }
 
 // This function simply removes comments from the specially-constructed ASCII ACE test file
-fn uncomment_ace_test_file() -> Result<()> {
-    let commented_filename: &Path = Path::new(*TEST_ACE_COMMENTED);
-    let uncommented_filename: &Path = Path::new(*TEST_ACE_UNCOMMENTED);
-    // Open test ASCII ACE
-    let commented_file = File::open(commented_filename).unwrap();
+fn uncomment_ace_test_file<P: AsRef<Path>>(path: P) -> Result<NamedTempFile> {
+    // Open input
+    let commented_file = File::open(path)?;
     let reader = BufReader::new(commented_file);
-    let uncommented_file = File::create(uncommented_filename).unwrap();
-    let uncommented_file = Mutex::new(uncommented_file);
 
-    // Rewrite the file without any of the comment lines
-    for _line in reader.lines() {
-        let line = _line.unwrap() + &String::from("\n");
+    // Create temp file in the OS temp dir
+    let mut tmp = NamedTempFile::new()?;
+
+    // Rewrite without comment lines
+    for line_result in reader.lines() {
+        let line = line_result?;
         if !line.starts_with("//") {
-            let mut uncommented_file = uncommented_file.lock().unwrap();
-            uncommented_file.write_all(line.into_bytes().as_slice())?;
-            uncommented_file.flush()?;
+            writeln!(tmp, "{}", line)?;
         }
     }
-    Ok(())
+
+    // Ensure contents are on disk before handing out the handle/path
+    tmp.flush()?;
+    Ok(tmp)
 }
 
-// The following code parses an example ACE file and saves it the resulting
-// `PaceData` is globally accesible for testing.
-pub async fn local_get_parsed_test_file() -> PaceData {
-    // In effect, this acts as a sloppy integration test as it involves
-    // the parsing of an actual ASCII ACE file.
-    let mut data: std::sync::MutexGuard<'_, Option<PaceData>> =
-        LOCAL_TEST_PACE_DATA.lock().unwrap();
+// The following code parses example ACE files and caches the resulting
+// `PaceData` so it is globally accessible for testing.
 
-    // Only parse the ACE file if it is not already parsed
-    if data.is_none() {
-        // Convert the ACE file to PACE
-        let mut start = Instant::now();
-        let _ = convert_ACE_to_PACE(*LOCAL_TEST_ACE);
-        println!(
-            "⚛️  Time to convert local ACE file to PACE ⚛️ : {} sec",
-            start.elapsed().as_secs_f32()
-        );
-
-        // Parse the PACE file
-        start = Instant::now();
-        let parsed_ace = PaceData::from_file(*LOCAL_TEST_PACE).await.unwrap();
-        println!(
-            "⚛️  Time to parse local PACE file ⚛️ : {} sec",
-            start.elapsed().as_secs_f32()
-        );
-        *data = Some(parsed_ace);
-    }
-    // Otherwise, return the already parsed data
-    data.as_ref().unwrap().clone()
-}
-
+// Default test data based on the canonical hydrogen test file.
 pub async fn get_parsed_test_file() -> PaceData {
     // In effect, this acts as a sloppy integration test as it involves
     // the parsing of an actual ACE file.
-    let mut data: std::sync::MutexGuard<'_, Option<PaceData>> = TEST_PACE_DATA.lock().unwrap();
+    let data = TEST_PACE_DATA
+        .get_or_init(|| async {
+            // Path to ACE test file
+            let ace_path = Path::new(TEST_ACE);
 
-    // Only parse the ACE file if it is not already parsed
-    if data.is_none() {
-        // Convert the ACE file to PACE
-        uncomment_ace_test_file();
-        let mut start = Instant::now();
-        let _ = convert_ACE_to_PACE(*TEST_ACE_UNCOMMENTED);
-        println!(
-            "⚛️  Time to convert ACE test file to PACE ⚛️ : {} sec",
-            start.elapsed().as_secs_f32()
-        );
+            // Deal with comments if we are using a custom commented ACE ASCII file, store in temp file
+            let tmp = uncomment_ace_test_file(ace_path).expect("Failed to uncomment ACE test file");
 
-        // Parse the PACE file
-        start = Instant::now();
-        let parsed_ace = PaceData::from_file(*TEST_PACE).await.unwrap();
-        println!(
-            "⚛️  Time to parse test PACE file ⚛️ : {} sec",
-            start.elapsed().as_secs_f32()
-        );
-        *data = Some(parsed_ace);
-    }
-    // Otherwise, return the already parsed data
-    data.as_ref().unwrap().clone()
+            // Convert the ACE file to a PACE file in the temp directory
+            let tmp_pace_path = time_it!(
+                format!("Time to convert ACE test file {} to PACE", TEST_ACE),
+                convert_ACE_to_PACE(tmp.path()).expect("Failed to convert ACE to PACE.")
+            );
+
+            // Also copy the generated PACE file into the same directory as the
+            // original ACE test file so it can be inspected later if desired.
+            if let Some(dir) = ace_path.parent() {
+                if let Some(fname) = tmp_pace_path.file_name() {
+                    let saved_pace_path = dir.join(fname);
+                    // Ignore copy errors here; the temp file is still usable
+                    let _ = std::fs::copy(&tmp_pace_path, &saved_pace_path);
+                }
+            }
+
+            // Parse into PaceData
+            let parsed_ace = time_it!(
+                format!("Time to parse test PACE file {}", tmp_pace_path.display()),
+                PaceData::from_file(&tmp_pace_path).await.unwrap()
+            );
+            parsed_ace
+        })
+        .await;
+
+    data.clone()
 }

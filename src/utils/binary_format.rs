@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Mutex,
 };
 
@@ -138,7 +138,7 @@ unsafe fn parse_tokens_from_line(line: &str) -> Vec<&str> {
 }
 
 // This function converts an ASCII ACE file into a PACE binary file.
-pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
+pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<PathBuf> {
     // Open ASCII ACE file
     let input_file = File::open(input_path.as_ref())?;
     let mut reader = BufReader::new(input_file);
@@ -250,5 +250,5 @@ pub fn convert_ACE_to_PACE<P: AsRef<Path>>(input_path: P) -> Result<String> {
     }
 
     // Return the path to the PACE file
-    Ok(output_path.to_string_lossy().into_owned())
+    Ok(output_path)
 }

@@ -1,7 +1,4 @@
-use std::iter::zip;
 use std::ops::{Deref, DerefMut};
-
-use anyhow::Result;
 use thiserror::Error;
 
 use crate::interpolation::InterpolationScheme;
@@ -72,7 +69,7 @@ impl InterpolationTable {
         }
 
         // We have a list of interpolation parameters and schemes
-        // Split out raw data into interpolation bounds, regions, and xy data
+        // Split out raw data into interpolation bounds, schemes, and xy data.
         let bounds_start = 1;
         let schemes_start = bounds_start + num_interp_regions;
         let schemes_end = schemes_start + num_interp_regions;
@@ -80,37 +77,41 @@ impl InterpolationTable {
         let x_start = schemes_end + 1;
         let y_start = x_start + num_data_points;
 
-        // Bounds, convert to zero-indexed for sanity
-        let bounds = std::iter::once(0).chain(
-            data[bounds_start..schemes_start]
-                .iter()
-                .map(|&val| val.to_bits() as usize - 1),
-        );
+        // Build a single XY vector for all points.
+        let mut points = Vec::with_capacity(num_data_points);
+        for i in 0..num_data_points {
+            points.push(XY {
+                x: data[x_start + i],
+                y: data[y_start + i],
+            });
+        }
 
-        // Schemes
-        let schemes = data[schemes_start..schemes_end]
+        // Bounds (ENDF-style, 1-based inclusive end indices); convert to 0-based.
+        let mut bounds: Vec<usize> = Vec::with_capacity(num_interp_regions + 1);
+        bounds.push(0);
+        for val in &data[bounds_start..schemes_start] {
+            bounds.push(val.to_bits() as usize - 1);
+        }
+
+        // Schemes for each region.
+        let schemes: Vec<InterpolationScheme> = data[schemes_start..schemes_end]
             .iter()
-            .map(|&val| InterpolationScheme::from(val.to_bits() as usize));
+            .map(|&val| InterpolationScheme::from(val.to_bits() as usize))
+            .collect();
 
-        // Data points
-        let data_points = zip(data[x_start..y_start].iter(), data[y_start..].iter())
-            .map(|(x, y)| XY { x: *x, y: *y });
+        // Create interpolation regions by slicing `points`.
+        let mut regions = Vec::with_capacity(num_interp_regions);
+        for (region_idx, scheme) in schemes.into_iter().enumerate() {
+            let start = bounds[region_idx];
+            let end = bounds[region_idx + 1];
+            let region_data = points[start..=end].to_vec();
+            regions.push(InterpolationRegion {
+                data: region_data,
+                interpolation_scheme: scheme,
+            });
+        }
 
-        // Create interpolation regions
-        let regions =
-            bounds
-                .clone()
-                .zip(bounds.skip(1))
-                .zip(schemes)
-                .map(|((start, end), scheme)| {
-                    let region_data = data_points.clone().skip(start).take(end - start + 1);
-                    InterpolationRegion {
-                        data: region_data.collect(),
-                        interpolation_scheme: scheme,
-                    }
-                });
-
-        InterpolationTable(regions.collect())
+        InterpolationTable(regions)
     }
 
     pub fn get_table_length(table_start: usize, array_containing_table: &[f64]) -> usize {
@@ -139,30 +140,32 @@ impl InterpolationTable {
         if self.len() < 1 {
             return Err(InterpolationError::InvalidTable());
         }
-        // Find the region that x_val falls into
+        // Find the region that x_val falls into.
         let region = self
             .iter()
             .find(|region| {
-                region.data[0].x <= x_val && x_val <= region.data.iter().last().unwrap().x
+                let first_x = region.data.first().unwrap().x;
+                let last_x = region.data.last().unwrap().x;
+                first_x <= x_val && x_val <= last_x
             })
             .ok_or_else(|| InterpolationError::RegionNotFound(x_val))?;
 
-        // Find the index of the bin that x_val falls into
+        // Find the index of the bin that x_val falls into via binary search.
         let idx = match region
             .data
             .binary_search_by(|xy| xy.x.partial_cmp(&x_val).unwrap())
         {
-            // We are exactly on a data point, exit early by returning the value
+            // Exactly on a data point; return immediately.
             Ok(idx) => return Ok(region.data[idx].y),
-            // We are inside a bin
+            // Inside a bin; `idx` is the upper bound, so use `idx - 1` as the lower index.
             Err(idx) => idx - 1,
         };
 
-        // Get the start and end points of the bin
+        // Get the start and end points of the bin.
         let start = &region.data[idx];
-        let end = region.data.get(idx + 1).unwrap();
+        let end = &region.data[idx + 1];
 
-        // Here are the values we need for interpolation
+        // Values needed for interpolation.
         let x0 = start.x;
         let x1 = end.x;
         let y0 = start.y;
