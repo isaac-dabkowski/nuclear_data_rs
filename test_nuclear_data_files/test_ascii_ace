@@ -22,7 +22,7 @@
 //     - SIG ✔
 //     - LAND ✔
 //     - AND ✔
-//     - LDLW
+//     - LDLW ✔
 //     - DLW
 //     - GPD
 //     - MTRP
@@ -46,19 +46,27 @@
     99.999   2.5301e-08 2025-02-05    2
   1100.00c    99.999  2.5301E-08   05/02/18
 H100 TEST (author)  Reference some_report by Author, A.B, et al.    mat 123
+//
 // IZAW array
       0         0.      0         0.      0         0.      0         0.
       0         0.      0         0.      0         0.      0         0.
       0         0.      0         0.      0         0.      0         0.
       0         0.      0         0.      0         0.      0         0.
+//
 // NXS array
       129     1100        3        1        1        1        1        6
         0        1      100        0        0        0        0        0
+//
 // JXS array
+//    ESZ       NU      MTR      LQR      TYR     LSIG      SIG     LAND
         1       24       16       23       92       17       18       93
-       95        0        0        0        0        0        0        0
+//    AND     LDLW      DLW      GPD     MTRP    LSIGP     SIGP    LANDP
+       95      130        0        0        0        0        0        0
+//   ANDP    LDLWP     DLWP       YP      FIS      END     LUNR      DNU
         0        0        0        0        0        0        0       43
+//    BDD    DNEDL     DNED                      PTYPE     NTRO     NEXT
        50        0        0        0        0        0        0        0
+//
 // XXS array
 //     ESZ 1-15
    1.00000000000E+00   2.00000000000E+00   3.00000000000E+00   1.00000000000E+02
@@ -99,7 +107,7 @@ H100 TEST (author)  Reference some_report by Author, A.B, et al.    mat 123
                   19
 //     LAND 93-94
                    1                   0
-//      AND 95-129
+//     AND 95-129
                    3   1.00000000000E-11   0.00000000000E+00   3.00000000000E+01
                   -8                 -19                   0                   2
                    3  -1.00000000000E+00   0.00000000000E+00   1.00000000000E+00
@@ -109,3 +117,5 @@ H100 TEST (author)  Reference some_report by Author, A.B, et al.    mat 123
    1.00000000000E+00   1.00000000000E+00   1.00000000000E+00   1.00000000000E+00
    1.00000000000E+00   1.00000000000E+00   0.00000000000E+00   0.25000000000E+00
    0.50000000000E+00   0.75000000000E+00   1.00000000000E+00
+//     LDLW 130
+                   1

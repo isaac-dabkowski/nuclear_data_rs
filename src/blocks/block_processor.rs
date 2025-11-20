@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use crate::arrays::{Arrays, JxsArray, NxsArray, XxsArray};
 use crate::blocks::block_traits::Parse;
-use crate::blocks::{AND, BDD, DNU, ESZ, LAND, LQR, LSIG, MTR, NU, SIG, TYR};
+use crate::blocks::{AND, BDD, DNU, ESZ, LAND, LDLW, LQR, LSIG, MTR, NU, SIG, TYR};
 use crate::time_it;
 use crate::utils::PaceMmap;
 
@@ -22,6 +22,7 @@ pub struct DataBlocks {
     pub TYR: Option<TYR>,
     pub LAND: Option<LAND>,
     pub AND: Option<AND>,
+    pub LDLW: Option<LDLW>,
 }
 
 impl DataBlocks {
@@ -82,6 +83,13 @@ impl DataBlocks {
         // Secondary neutron angular distributions
         let and = time_it!("AND", AND::parse(&arrays, (&tyr, &land)));
 
+        // -------------------------------------------
+        // Blocks present if isotope has reactions
+        // with secondary neutrons (NXS(5) != 0)
+        // -------------------------------------------
+        // Secondary neutron energy distribution locators
+        let ldlw = time_it!("LDLW", LDLW::parse(&arrays, ()));
+
         Ok(Self {
             ESZ: esz,
             MTR: mtr,
@@ -94,6 +102,7 @@ impl DataBlocks {
             TYR: tyr,
             LAND: land,
             AND: and,
+            LDLW: ldlw
         })
     }
 }
