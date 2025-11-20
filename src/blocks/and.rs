@@ -233,6 +233,7 @@ fn make_tabulated_distribution_from_data(
     .unwrap()
 }
 
+#[cfg(not(feature = "local"))]
 #[cfg(test)]
 mod tests {
     use super::*;

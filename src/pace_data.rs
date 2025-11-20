@@ -136,54 +136,63 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_szaid_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.szaid(), Some("1100.800nc"));
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_zaid_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.zaid(), "1100.00c");
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_atomic_mass_fraction_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.atomic_mass_fraction(), 99.999);
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_kT_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.kT(), 2.5301e-08);
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_temperature_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.temperature(), 293.6059129982851);
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_za_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.za(), 1100);
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_z_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.z(), 1);
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_a_parsing() {
         let parsed_ace = get_parsed_test_file().await;
         assert_eq!(parsed_ace.a(), 100);
     }
 
+    #[cfg(not(feature = "local"))]
     #[tokio::test]
     async fn test_name_parsing() {
         let parsed_ace = get_parsed_test_file().await;

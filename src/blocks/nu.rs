@@ -172,6 +172,7 @@ impl TabulatedNu {
     }
 }
 
+#[cfg(not(feature = "local"))]
 #[cfg(test)]
 mod tests {
     use super::*;

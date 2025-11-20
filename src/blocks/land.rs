@@ -96,6 +96,7 @@ impl std::fmt::Display for LAND {
     }
 }
 
+#[cfg(not(feature = "local"))]
 #[cfg(test)]
 mod tests {
     use crate::{helpers::MTNumber, utils::get_parsed_test_file};

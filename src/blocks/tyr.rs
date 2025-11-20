@@ -155,6 +155,7 @@ impl From<isize> for ExitingNeutronData {
     }
 }
 
+#[cfg(not(feature = "local"))]
 #[cfg(test)]
 mod tests {
     use super::*;

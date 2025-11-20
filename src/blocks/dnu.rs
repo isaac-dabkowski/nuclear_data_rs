@@ -59,6 +59,7 @@ impl std::fmt::Display for DNU {
     }
 }
 
+#[cfg(not(feature = "local"))]
 #[cfg(test)]
 mod tests {
     use crate::utils::get_parsed_test_file;

@@ -57,6 +57,7 @@ impl std::fmt::Display for LSIG {
     }
 }
 
+#[cfg(not(feature = "local"))]
 #[cfg(test)]
 mod tests {
     use crate::utils::get_parsed_test_file;
